@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Hefti</title>
+    <link rel="stylesheet" href="/static/css/bootstrap.css" type="text/css" media="screen" title="no title" charset="utf-8">
+  </head>
+  <body>
+    <div class="container">
+      <ul class="list-group">
+        {{#each entrys}} 
+        <li class="list-group-item">
+          <div id="{{id}}">
+            <div class="row">
+              <div class="input-group mb-3">
+                <div class="col-11">
+                  <input id="title" type="text" class="form-control" value="{{title}}"></input>
+                </div>
+                <div class="col">
+                  <input id="duration" type="text" class="form-control" value="{{duration}}"></input>
+                </div>
+              </div>
+            </div>
+            <div class="row">
+              <div class="input-group mb-3">
+                <div class="col-3">
+                  <input id="type" type="text" class="form-control" value="{{type}}"></input>
+                </div>
+                <div class="col-8"></div>
+                <div class="col-1">
+                  <input id="date" type="text" class="form-control" value="{{logdate}}"></input>
+                </div>
+              </div>
+            </div>
+          </div>
+        </li>
+        {{/each}}
+      </ul>
+    </div>
+  </body>
+</html>
