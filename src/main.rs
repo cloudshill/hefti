@@ -1,36 +1,45 @@
 #[macro_use]
+extern crate log;
+extern crate env_logger;
+
+#[macro_use]
 extern crate diesel;
 extern crate dotenv;
-extern crate env_logger;
-extern crate handlebars_iron as hbs;
-extern crate iron;
-extern crate logger;
-extern crate mount;
-extern crate persistent;
-extern crate router;
 #[macro_use]
 extern crate serde_derive;
 extern crate chrono;
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
+
+extern crate handlebars_iron as hbs;
+extern crate iron;
+extern crate logger;
+extern crate mount;
+extern crate params;
+extern crate persistent;
+extern crate router;
 extern crate staticfile;
 
+use std::{env, path::Path};
+
+use chrono::prelude::*;
 use diesel::{
     pg::PgConnection,
     prelude::*,
     r2d2::{Builder, ConnectionManager, Pool},
 };
 use dotenv::dotenv;
+use serde_json::Map;
+
 use hbs::{DirectorySource, HandlebarsEngine, Template};
 use iron::{prelude::*, status, typemap::Key};
 use logger::Logger;
 use mount::Mount;
+use params::{Params, Value};
 use persistent::State;
 use router::Router;
-use serde_json::Map;
 use staticfile::Static;
-use std::{env, path::Path};
 
 use self::models::*;
 
@@ -63,6 +72,7 @@ fn main() {
 
     let mut router = Router::new();
     router.get("/", index, "index");
+    router.get("/week/:year/:week", week_handler, "week");
 
     let mut mount = Mount::new();
     mount
@@ -98,4 +108,24 @@ fn index(req: &mut Request) -> IronResult<Response> {
         .set_mut(status::Ok);
 
     Ok(resp)
+}
+
+fn week_handler(req: &mut Request) -> IronResult<Response> {
+    let ref router = req.extensions.get::<Router>().unwrap();
+
+    let week: u32 = router.find("week").unwrap().parse().unwrap();
+    let year: i32 = router.find("year").unwrap().parse().unwrap();
+    dbg!(to_week_days(year, week));
+
+    Ok(Response::with(status::Ok))
+}
+
+fn to_week_days(year: i32, week: u32) -> Vec<NaiveDate> {
+    use chrono::Weekday::*;
+
+    let weekdays = [Mon, Tue, Wed, Thu, Fri, Sat, Sun].iter();
+
+    weekdays
+        .map(|day| NaiveDate::from_isoywd(year, week, *day))
+        .collect()
 }
