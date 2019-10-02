@@ -36,7 +36,6 @@ use hbs::{DirectorySource, HandlebarsEngine, Template};
 use iron::{prelude::*, status, typemap::Key};
 use logger::Logger;
 use mount::Mount;
-use params::{Params, Value};
 use persistent::State;
 use router::Router;
 use staticfile::Static;
