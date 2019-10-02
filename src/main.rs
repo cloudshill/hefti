@@ -27,7 +27,7 @@ use chrono::prelude::*;
 use diesel::{
     pg::PgConnection,
     prelude::*,
-    r2d2::{Builder, ConnectionManager, Pool},
+    r2d2::{Builder, ConnectionManager, Pool, PooledConnection},
 };
 use dotenv::dotenv;
 use serde_json::Map;
@@ -45,10 +45,12 @@ use self::models::*;
 mod models;
 mod schema;
 
-struct Database;
-impl Key for Database {
+struct DatabasePool;
+impl Key for DatabasePool {
     type Value = Pool<ConnectionManager<PgConnection>>;
 }
+
+type Database = PooledConnection<ConnectionManager<PgConnection>>;
 
 fn main() {
     dotenv().ok();
@@ -80,7 +82,7 @@ fn main() {
 
     let mut chain = Chain::new(mount);
     chain.link_before(logger_before);
-    chain.link(State::<Database>::both(pool));
+    chain.link(State::<DatabasePool>::both(pool));
     chain.link_after(logger_after);
     chain.link_after(hbse);
 
@@ -90,13 +92,8 @@ fn main() {
 fn index(req: &mut Request) -> IronResult<Response> {
     use self::schema::entry::dsl::*;
 
-    let db = req
-        .get::<State<Database>>()
-        .unwrap()
-        .read()
-        .unwrap()
-        .get()
-        .unwrap();
+    // TODO: Clean this up
+    let db = get_db(req)?;
     let mut context = Map::new();
 
     let entrys = entry.load::<Entry>(&db).expect("Error loading entries");
@@ -123,8 +120,23 @@ fn week_handler(req: &mut Request) -> IronResult<Response> {
 fn to_week_days(year: i32, week: u32) -> Vec<NaiveDate> {
     use chrono::Weekday::*;
 
+    trace!("week: {}, year: {}", week, year);
+
     [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
         .iter()
         .map(|day| NaiveDate::from_isoywd(year, week, *day))
         .collect()
+}
+
+fn get_db(req: &mut Request) -> IronResult<Database> {
+    match req
+        .get::<State<DatabasePool>>()
+        .unwrap()
+        .read()
+        .unwrap()
+        .get()
+    {
+        Ok(db) => Ok(db),
+        Err(e) => Err(IronError::new(e, status::InternalServerError)),
+    }
 }
