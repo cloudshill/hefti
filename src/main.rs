@@ -106,13 +106,33 @@ fn index(req: &mut Request) -> IronResult<Response> {
 }
 
 fn week_handler(req: &mut Request) -> IronResult<Response> {
+    use self::schema::entry::dsl::*;
+    let mut context = Map::new();
+
     let ref router = req.extensions.get::<Router>().unwrap();
 
     let week: u32 = router.find("week").unwrap().parse().unwrap();
     let year: i32 = router.find("year").unwrap().parse().unwrap();
-    trace!("weekdays {:#?}", to_week_days(year, week));
+    let weekdays = to_week_days(year, week);
+    trace!("weekdays {:#?}", weekdays);
 
-    Ok(Response::with(status::Ok))
+    let db = get_db(req)?;
+    let entrys = match entry
+        .filter(logdate.between(weekdays.first().unwrap(), weekdays.last().unwrap()))
+        .order_by(logdate)
+        .load::<Entry>(&db)
+    {
+        Ok(i) => i,
+        Err(e) => return Err(IronError::new(e, status::InternalServerError)),
+    };
+
+    context.insert("entrys".into(), json!(entrys));
+
+    let mut resp = Response::new();
+    resp.set_mut(Template::new("index", context))
+        .set_mut(status::Ok);
+
+    Ok(resp)
 }
 
 /// returns a Vec with all days of that week
