@@ -92,7 +92,6 @@ fn main() {
 fn index(req: &mut Request) -> IronResult<Response> {
     use self::schema::entry::dsl::*;
 
-    // TODO: Clean this up
     let db = get_db(req)?;
     let mut context = Map::new();
 
@@ -111,7 +110,7 @@ fn week_handler(req: &mut Request) -> IronResult<Response> {
 
     let week: u32 = router.find("week").unwrap().parse().unwrap();
     let year: i32 = router.find("year").unwrap().parse().unwrap();
-    dbg!(to_week_days(year, week));
+    trace!("weekdays {:#?}", to_week_days(year, week));
 
     Ok(Response::with(status::Ok))
 }
@@ -128,7 +127,10 @@ fn to_week_days(year: i32, week: u32) -> Vec<NaiveDate> {
         .collect()
 }
 
+/// Gets a database connection from the pool
+/// error will 500 HTTP status
 fn get_db(req: &mut Request) -> IronResult<Database> {
+    trace!("Getting new database connection from Pool");
     match req
         .get::<State<DatabasePool>>()
         .unwrap()
