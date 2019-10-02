@@ -119,12 +119,12 @@ fn week_handler(req: &mut Request) -> IronResult<Response> {
     Ok(Response::with(status::Ok))
 }
 
+/// returns a Vec with all days of that week
 fn to_week_days(year: i32, week: u32) -> Vec<NaiveDate> {
     use chrono::Weekday::*;
 
-    let weekdays = [Mon, Tue, Wed, Thu, Fri, Sat, Sun].iter();
-
-    weekdays
+    [Mon, Tue, Wed, Thu, Fri, Sat, Sun]
+        .iter()
         .map(|day| NaiveDate::from_isoywd(year, week, *day))
         .collect()
 }
