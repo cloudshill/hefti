@@ -1,6 +1,8 @@
+use super::schema::*;
 use chrono::prelude::*;
 
-#[derive(Queryable, Debug, Serialize)]
+#[derive(Identifiable, Queryable, AsChangeset, Clone, Debug, Serialize, Deserialize)]
+#[table_name = "entries"]
 pub struct Entry {
     pub id: i32,
     pub title: String,

@@ -17,7 +17,7 @@ staticfile = "0.5"
 mount = "0.4"
 handlebars-iron = "0.28"
 logger = "0.4"
-params = "0.8"
+bodyparser = "0.8"
 
 dotenv = "0.14"
 diesel = { version = "1.4", features = ["extras", "postgres"] }

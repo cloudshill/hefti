@@ -12,11 +12,11 @@ extern crate serde;
 #[macro_use]
 extern crate serde_json;
 
+extern crate bodyparser;
 extern crate handlebars_iron as hbs;
 extern crate iron;
 extern crate logger;
 extern crate mount;
-extern crate params;
 extern crate persistent;
 extern crate router;
 extern crate staticfile;
@@ -36,7 +36,7 @@ use hbs::{DirectorySource, HandlebarsEngine, Template};
 use iron::{prelude::*, status, typemap::Key};
 use logger::Logger;
 use mount::Mount;
-use persistent::State;
+use persistent::{Read, State};
 use router::Router;
 use staticfile::Static;
 
@@ -44,6 +44,8 @@ use self::models::*;
 
 mod models;
 mod schema;
+
+const MAX_BODY_LENGTH: usize = 1024 * 1024 * 10;
 
 struct DatabasePool;
 impl Key for DatabasePool {
@@ -74,6 +76,7 @@ fn main() {
     let mut router = Router::new();
     router.get("/", index, "index");
     router.get("/week/:year/:week", week_handler, "week");
+    router.put("/post", update_handler, "update post");
 
     let mut mount = Mount::new();
     mount
@@ -82,6 +85,7 @@ fn main() {
 
     let mut chain = Chain::new(mount);
     chain.link_before(logger_before);
+    chain.link_before(Read::<bodyparser::MaxBodyLength>::one(MAX_BODY_LENGTH));
     chain.link(State::<DatabasePool>::both(pool));
     chain.link_after(logger_after);
     chain.link_after(hbse);
@@ -90,13 +94,13 @@ fn main() {
 }
 
 fn index(req: &mut Request) -> IronResult<Response> {
-    use self::schema::entry::dsl::*;
+    use self::schema::entries::dsl::*;
 
     let db = get_db(req)?;
     let mut context = Map::new();
 
-    let entrys = entry.load::<Entry>(&db).expect("Error loading entries");
-    context.insert("entrys".into(), json!(entrys));
+    let result = entries.load::<Entry>(&db).expect("Error loading entries");
+    context.insert("entrys".into(), json!(result));
 
     let mut resp = Response::new();
     resp.set_mut(Template::new("index", context))
@@ -106,7 +110,7 @@ fn index(req: &mut Request) -> IronResult<Response> {
 }
 
 fn week_handler(req: &mut Request) -> IronResult<Response> {
-    use self::schema::entry::dsl::*;
+    use self::schema::entries::dsl::*;
     let mut context = Map::new();
 
     let ref router = req.extensions.get::<Router>().unwrap();
@@ -117,7 +121,7 @@ fn week_handler(req: &mut Request) -> IronResult<Response> {
     trace!("weekdays {:#?}", weekdays);
 
     let db = get_db(req)?;
-    let entrys = match entry
+    let entrys = match entries
         .filter(logdate.between(weekdays.first().unwrap(), weekdays.last().unwrap()))
         .order_by(logdate)
         .load::<Entry>(&db)
@@ -133,6 +137,22 @@ fn week_handler(req: &mut Request) -> IronResult<Response> {
         .set_mut(status::Ok);
 
     Ok(resp)
+}
+
+fn update_handler(req: &mut Request) -> IronResult<Response> {
+    let db = get_db(req)?;
+
+    match req.get::<bodyparser::Struct<Entry>>() {
+        Ok(Some(item)) => {
+            return diesel::update(&item)
+                .set(&item)
+                .execute(&db)
+                .map(|_| Response::with(status::Ok))
+                .map_err(|e| IronError::new(e, status::InternalServerError))
+        }
+        Ok(None) => Ok(Response::with(status::Ok)),
+        Err(e) => Err(IronError::new(e, status::InternalServerError)),
+    }
 }
 
 /// returns a Vec with all days of that week
