@@ -66,10 +66,7 @@ fn main() {
 
     let mut hbse = HandlebarsEngine::new();
     hbse.add(Box::new(DirectorySource::new("./templates/", ".hbs")));
-
-    if let Err(r) = hbse.reload() {
-        panic! {"{}", r};
-    }
+    hbse.reload().unwrap();
 
     let (logger_before, logger_after) = Logger::new(None);
 
