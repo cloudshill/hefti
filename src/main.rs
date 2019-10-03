@@ -74,6 +74,7 @@ fn main() {
     router.get("/", index, "index");
     router.get("/week/:year/:week", week_handler, "week");
     router.put("/post", update_handler, "update post");
+    router.post("/post", add_handler, "add post");
 
     let mut mount = Mount::new();
     mount
@@ -143,6 +144,23 @@ fn update_handler(req: &mut Request) -> IronResult<Response> {
         Ok(Some(item)) => {
             return diesel::update(&item)
                 .set(&item)
+                .execute(&db)
+                .map(|_| Response::with(status::Ok))
+                .map_err(|e| IronError::new(e, status::InternalServerError))
+        }
+        Ok(None) => Ok(Response::with(status::Ok)),
+        Err(e) => Err(IronError::new(e, status::InternalServerError)),
+    }
+}
+
+fn add_handler(req: &mut Request) -> IronResult<Response> {
+    use self::schema::entries::dsl::*;
+    let db = get_db(req)?;
+
+    match req.get::<bodyparser::Struct<EntryForm>>() {
+        Ok(Some(item)) => {
+            return diesel::insert_into(entries)
+                .values(&item)
                 .execute(&db)
                 .map(|_| Response::with(status::Ok))
                 .map_err(|e| IronError::new(e, status::InternalServerError))
