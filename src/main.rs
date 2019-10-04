@@ -66,6 +66,7 @@ fn main() {
 
     let mut hbse = HandlebarsEngine::new();
     hbse.add(Box::new(DirectorySource::new("./templates/", ".hbs")));
+    hbse.handlebars_mut().set_strict_mode(true);
     hbse.reload().unwrap();
 
     let (logger_before, logger_after) = Logger::new(None);
