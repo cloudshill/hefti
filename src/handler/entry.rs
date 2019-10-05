@@ -20,7 +20,7 @@ pub fn update_handler(req: &mut Request) -> IronResult<Response> {
                 .map(|_| Response::with(status::Ok))
                 .map_err(|e| IronError::new(e, status::InternalServerError))
         }
-        Ok(None) => Ok(Response::with(status::Ok)),
+        Ok(None) => Ok(Response::with(status::NotFound)),
         Err(e) => Err(IronError::new(e, status::InternalServerError)),
     }
 }
