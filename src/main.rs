@@ -74,9 +74,9 @@ fn main() {
     let mut router = Router::new();
     router.get("/", index, "index");
     router.get("/week/:year/:week", week_handler, "week");
-    router.put("/post", update_handler, "update post");
+    router.put("/post/:id", update_handler, "update post");
     router.post("/post", add_handler, "add post");
-    router.delete("/post", delete_handler, "delete post");
+    router.delete("/post/:id", delete_handler, "delete post");
 
     let mut mount = Mount::new();
     mount
@@ -140,11 +140,15 @@ fn week_handler(req: &mut Request) -> IronResult<Response> {
 }
 
 fn update_handler(req: &mut Request) -> IronResult<Response> {
+    use self::schema::entries::dsl::*;
     let db = get_db(req)?;
 
-    match req.get::<bodyparser::Struct<Entry>>() {
+    let ref router = req.extensions.get::<Router>().unwrap();
+    let req_id: i32 = router.find("id").unwrap().parse().unwrap();
+
+    match req.get::<bodyparser::Struct<EntryForm>>() {
         Ok(Some(item)) => {
-            return diesel::update(&item)
+            return diesel::update(entries.filter(id.eq(req_id)))
                 .set(&item)
                 .execute(&db)
                 .map(|_| Response::with(status::Ok))
@@ -167,7 +171,7 @@ fn add_handler(req: &mut Request) -> IronResult<Response> {
                 .map(|_| Response::with(status::Ok))
                 .map_err(|e| IronError::new(e, status::InternalServerError))
         }
-        Ok(None) => Ok(Response::with(status::Ok)),
+        Ok(None) => Ok(Response::with(status::NotFound)),
         Err(e) => Err(IronError::new(e, status::InternalServerError)),
     }
 }
@@ -176,16 +180,13 @@ fn delete_handler(req: &mut Request) -> IronResult<Response> {
     use self::schema::entries::dsl::*;
     let db = get_db(req)?;
 
-    match req.get::<bodyparser::Json>() {
-        Ok(Some(item)) => {
-            return diesel::delete(entries.filter(id.eq(item["id"].as_i64().unwrap() as i32)))
-                .execute(&db)
-                .map(|_| Response::with(status::Ok))
-                .map_err(|e| IronError::new(e, status::InternalServerError))
-        }
-        Ok(None) => Ok(Response::with(status::Ok)),
-        Err(e) => Err(IronError::new(e, status::InternalServerError)),
-    }
+    let ref router = req.extensions.get::<Router>().unwrap();
+    let req_id: i32 = router.find("id").unwrap().parse().unwrap();
+
+    diesel::delete(entries.filter(id.eq(req_id)))
+        .execute(&db)
+        .map(|_| Response::with(status::Ok))
+        .map_err(|e| IronError::new(e, status::InternalServerError))
 }
 
 /// returns a Vec with all days of that week

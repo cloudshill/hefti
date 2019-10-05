@@ -12,7 +12,7 @@ pub struct Entry {
     pub entry_type: String,
 }
 
-#[derive(Insertable, Clone, Debug, Serialize, Deserialize)]
+#[derive(AsChangeset, Insertable, Clone, Debug, Serialize, Deserialize)]
 #[table_name = "entries"]
 pub struct EntryForm {
     pub title: String,
