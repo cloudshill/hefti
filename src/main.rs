@@ -39,9 +39,11 @@ use persistent::{Read, State};
 use router::Router;
 use staticfile::Static;
 
+use self::handler::entry::*;
 use self::models::*;
 use self::utils::*;
 
+mod handler;
 mod models;
 mod schema;
 mod utils;
@@ -131,54 +133,4 @@ fn week_handler(req: &mut Request) -> IronResult<Response> {
         .set_mut(status::Ok);
 
     Ok(resp)
-}
-
-fn update_handler(req: &mut Request) -> IronResult<Response> {
-    use self::schema::entries::dsl::*;
-    let db = get_db(req)?;
-
-    let ref router = req.extensions.get::<Router>().unwrap();
-    let req_id: i32 = router.find("id").unwrap().parse().unwrap();
-
-    match req.get::<bodyparser::Struct<EntryForm>>() {
-        Ok(Some(item)) => {
-            return diesel::update(entries.filter(id.eq(req_id)))
-                .set(&item)
-                .execute(&db)
-                .map(|_| Response::with(status::Ok))
-                .map_err(|e| IronError::new(e, status::InternalServerError))
-        }
-        Ok(None) => Ok(Response::with(status::Ok)),
-        Err(e) => Err(IronError::new(e, status::InternalServerError)),
-    }
-}
-
-fn add_handler(req: &mut Request) -> IronResult<Response> {
-    use self::schema::entries::dsl::*;
-    let db = get_db(req)?;
-
-    match req.get::<bodyparser::Struct<EntryForm>>() {
-        Ok(Some(item)) => {
-            return diesel::insert_into(entries)
-                .values(&item)
-                .execute(&db)
-                .map(|_| Response::with(status::Ok))
-                .map_err(|e| IronError::new(e, status::InternalServerError))
-        }
-        Ok(None) => Ok(Response::with(status::NotFound)),
-        Err(e) => Err(IronError::new(e, status::InternalServerError)),
-    }
-}
-
-fn delete_handler(req: &mut Request) -> IronResult<Response> {
-    use self::schema::entries::dsl::*;
-    let db = get_db(req)?;
-
-    let ref router = req.extensions.get::<Router>().unwrap();
-    let req_id: i32 = router.find("id").unwrap().parse().unwrap();
-
-    diesel::delete(entries.filter(id.eq(req_id)))
-        .execute(&db)
-        .map(|_| Response::with(status::Ok))
-        .map_err(|e| IronError::new(e, status::InternalServerError))
 }
