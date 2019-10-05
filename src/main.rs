@@ -68,9 +68,9 @@ fn main() {
     let mut router = Router::new();
     router.get("/", index, "index");
     router.get("/week/:year/:week", week_handler, "week");
-    router.put("/post/:id", update_handler, "update post");
-    router.post("/post", add_handler, "add post");
-    router.delete("/post/:id", delete_handler, "delete post");
+    router.put("/entry/:id", update_handler, "update entry");
+    router.post("/entry", add_handler, "add entry");
+    router.delete("/entry/:id", delete_handler, "delete entry");
 
     let mut mount = Mount::new();
     mount
