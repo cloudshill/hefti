@@ -5,7 +5,16 @@ use router::Router;
 use crate::models::EntryForm;
 use crate::utils::*;
 
-pub fn update_handler(req: &mut Request) -> IronResult<Response> {
+// all routes are prefixed with /entry
+pub fn routes() -> Router {
+    let mut router = Router::new();
+    router.put("/entry/:id", update_handler, "update entry");
+    router.post("/entry", add_handler, "add entry");
+    router.delete("/entry/:id", delete_handler, "delete entry");
+    router
+}
+
+fn update_handler(req: &mut Request) -> IronResult<Response> {
     use crate::schema::entries::dsl::*;
     let db = get_db(req)?;
 
@@ -25,7 +34,7 @@ pub fn update_handler(req: &mut Request) -> IronResult<Response> {
     }
 }
 
-pub fn add_handler(req: &mut Request) -> IronResult<Response> {
+fn add_handler(req: &mut Request) -> IronResult<Response> {
     use crate::schema::entries::dsl::*;
     let db = get_db(req)?;
 
@@ -42,7 +51,7 @@ pub fn add_handler(req: &mut Request) -> IronResult<Response> {
     }
 }
 
-pub fn delete_handler(req: &mut Request) -> IronResult<Response> {
+fn delete_handler(req: &mut Request) -> IronResult<Response> {
     use crate::schema::entries::dsl::*;
     let db = get_db(req)?;
 

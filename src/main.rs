@@ -39,7 +39,6 @@ use persistent::{Read, State};
 use router::Router;
 use staticfile::Static;
 
-use self::handler::entry::*;
 use self::models::*;
 use self::utils::*;
 
@@ -70,9 +69,7 @@ fn main() {
     let mut router = Router::new();
     router.get("/", index, "index");
     router.get("/week/:year/:week", week_handler, "week");
-    router.put("/entry/:id", update_handler, "update entry");
-    router.post("/entry", add_handler, "add entry");
-    router.delete("/entry/:id", delete_handler, "delete entry");
+    router.any("/entry/*", handler::entry::routes(), "entry API");
 
     let mut mount = Mount::new();
     mount
