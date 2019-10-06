@@ -8,11 +8,14 @@ $(document).ready(function() {
           <div class="idholder">
             <div class="row">
               <div class="input-group mb-3">
-                <div class="col-10">
+                <div class="col-9">
                   <input id="title" type="text" class="form-control"></input>
                 </div>
-                <div class="col">
+                <div class="col-2">
                   <input id="spend_time" type="number" class="form-control" value="0"></input>
+                </div>
+                <div class="col-1">
+                  <button class="btn btn-danger" id="remove">-</button>
                 </div>
               </div>
             </div>
@@ -40,6 +43,7 @@ $(document).ready(function() {
   });
 
   $("input,select").change(addOrUpdate);
+  $("#remove").click(remove)
 });
 
 
@@ -56,9 +60,12 @@ function addOrUpdate() {
   } else {
     $.ajax({url: "/entry/" + obj.attr("id"), type: "PUT", data: JSON.stringify(entry)});
   }
-
-
 }
 
-  $.ajax({url: "/entry/" + id, type: "DELETE"});
+function remove() {
+  var obj = $(this).parents(".idholder");
+  if (obj.attr("id") !== undefined) {
+    $.ajax({url: "/entry/" + obj.attr("id"), type: "DELETE"});
+  }
+  obj.parent(".list-group-item").remove();
 }
