@@ -51,7 +51,7 @@ pub fn to_hours(
 ) -> HelperResult {
     let param = h.param(0).unwrap();
 
-    match param.value().as_i64().unwrap() / 60 {
+    match param.value().as_i64().unwrap() {
         x if x == 1 => out.write(format!("{} Stunde", x).as_str()),
         x => out.write(format!("{} Stunden", x).as_str()),
     }
