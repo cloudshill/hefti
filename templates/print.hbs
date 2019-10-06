@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="stylesheet" href="/static/css/print.css" type="text/css" charset="utf-8">
+    <title>Print</title>
+  </head>
+  <body>
+    <div class="container site" style="height: 100%">
+      <div class="box header">
+        <b>Name, Vorname: Alexander Sieg</b> <br>
+        <b>Ausbildungsnachweis</b> Nr. {{number}} für die Woche vom {{date-start}} bis {{date-end}} <br>
+        Ausbildungsjahr: {{year}} 
+      </div>
+      <div class="field box betrieb">
+        <div class="description">Betriebliche Tätigkeiten</div>
+        <div class="content container">
+          {{#each betrieb}}
+          <div class="title">{{title}}</div>
+          <div class="time">{{to_hours spend_time}}</div>
+          {{/each}}
+        </div>
+      </div>
+      <div class="field box schlungen">
+        <div class="description">Unterweisungen, betrieblicher Unterricht, sonstige Schulungen</div>
+        <div class="content container">
+          {{#each schulungen}}
+          <div class="title">{{title}}</div>
+          <div class="time">{{to_hours spend_time}}</div>
+          {{/each}}
+        </div>
+      </div>
+      <div class="field box schule">
+        <div class="description">Berufsschule (Unterrichtsthemen)</div>
+        <div class="content container">
+          {{#each schule}}
+          <div class="title">{{title}}</div>
+          <div class="time">{{to_hours spend_time}}</div>
+          {{/each}}
+        </div>
+      </div>
+      <div class="box signature container">
+        <div class="left container">
+          <div class="signature-date">Datum:</div>
+          <div class="signature-line">Unterschrift Auszubildender</div>
+        </div>
+        <div class="right container">
+          <div class="signature-date">Datum:</div>
+          <div class="signature-line">Unterschrift Ausbildender</div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

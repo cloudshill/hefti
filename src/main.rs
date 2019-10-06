@@ -13,6 +13,7 @@ extern crate serde;
 extern crate serde_json;
 
 extern crate bodyparser;
+extern crate handlebars;
 extern crate handlebars_iron as hbs;
 extern crate iron;
 extern crate logger;
@@ -31,6 +32,7 @@ use diesel::{
 use dotenv::dotenv;
 use serde_json::Map;
 
+use handlebars::Handlebars;
 use hbs::{DirectorySource, HandlebarsEngine, Template};
 use iron::{prelude::*, status};
 use logger::Logger;
@@ -59,7 +61,9 @@ fn main() {
         .build(manager)
         .expect("Database connection failed");
 
-    let mut hbse = HandlebarsEngine::new();
+    let mut hbsr = Handlebars::new();
+    hbsr.register_helper("to_hours", Box::new(to_hours));
+    let mut hbse = HandlebarsEngine::from(hbsr);
     hbse.add(Box::new(DirectorySource::new("./templates/", ".hbs")));
     hbse.handlebars_mut().set_strict_mode(true);
     hbse.reload().unwrap();
@@ -70,6 +74,7 @@ fn main() {
     router.get("/", index, "index");
     router.get("/week/:year/:week", week_handler, "week");
     router.any("/entry/*", handler::entry::routes(), "entry API");
+    router.any("/print/*", handler::print::routes(), "print");
 
     let mut mount = Mount::new();
     mount

@@ -3,6 +3,7 @@ use diesel::{
     pg::PgConnection,
     r2d2::{ConnectionManager, Pool, PooledConnection},
 };
+use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
 use iron::{prelude::*, status, typemap::Key};
 use persistent::State;
 
@@ -39,4 +40,22 @@ pub fn get_db(req: &mut Request) -> IronResult<Database> {
         Ok(db) => Ok(db),
         Err(e) => Err(IronError::new(e, status::InternalServerError)),
     }
+}
+
+pub fn to_hours(
+    h: &Helper,
+    _: &Handlebars,
+    _: &Context,
+    _: &mut RenderContext,
+    out: &mut dyn Output,
+) -> HelperResult {
+    let param = h.param(0).unwrap();
+
+    match param.value().as_i64().unwrap() / 60 {
+        x if x == 1 => out.write(format!("{} Stunde", x).as_str()),
+        x => out.write(format!("{} Stunden", x).as_str()),
+    }
+    .unwrap();
+
+    Ok(())
 }

@@ -1,0 +1,100 @@
+body {
+  width: 21cm;
+  height: 29.7cm;
+  margin: 1.27cm 1.27cm 2.5cm 2.5cm; 
+}
+
+.container {
+  display: grid;
+}
+
+.container.site {
+  grid-row-gap: 1em;
+  grid-template-rows: 4em auto auto auto 10em;
+}
+
+.box {
+  border-style: solid;
+  border-color: black;
+  border-width: 0.2mm;
+}
+
+.header {
+  width: 100%;
+  grid-row: 1 / 2;
+  height: 4em;
+}
+
+.header br {
+  font-size: 18px;
+}
+
+.betrieb {
+  grid-row: 2 / 3;
+}
+
+.schulungen {
+  grid-row: 3 / 4;
+}
+
+.schule {
+  grid-row: 4 / 5;
+}
+
+.signature {
+  grid-row: 5 / 6;
+  grid-template-columns: 50% 50%;
+}
+
+.signature .left {
+  grid-column: 1 / 2;
+  width: 100%;
+  border-right-style: solid;
+  border-right-width: 0.1em;
+}
+
+.signature .right {
+  width: 100;
+  grid-column: 2 / 3;
+}
+
+.signature div {
+  grid-template-rows: auto 3em;
+}
+
+.signature-date {
+  grid-row: 1 / 2;
+  margin: 1em;
+}
+
+.signature-line {
+  margin: 1em;
+  grid-row: 2 / 3;
+  border-top-style: solid;
+  border-top-width: 0.1em;
+}
+
+.container.field {
+ grid-template-rows: 1em auto;
+}
+
+.description {
+  grid-row: 1 / 2;
+  border-bottom-style: solid;
+  border-bottom-width: 0.1em;
+}
+
+.title {
+  grid-column: 1 / 2;
+}
+
+.time {
+  grid-column: 2 / 3;
+  text-align: right;
+  margin-right: 0.5em;
+}
+
+.content {
+  grid-template-columns: auto 15%;
+}
+
