@@ -60,27 +60,5 @@ function addOrUpdate() {
 
 }
 
-function add(object) {
-  var entry = {
-    title: object.find("#title").val(),
-    logdate: object.find("#date").val(),
-    entry_type: object.find("#type").val(),
-    spend_time: parseFloat(object.find("#spend_time").val())
-  };
-  $.ajax({url: "/entry/" + id, type: "POST", data: JSON.stringify(entry)});
-}
-
-function update(id) {
-  var par = $(".idholder#" + id);
-  var entry = {
-    title: par.find("#title").val(),
-    logdate: par.find("#date").val(),
-    entry_type: par.find("#type").val(),
-    spend_time: parseFloat(par.find("#spend_time").val())
-  };
-  $.ajax({url: "/entry/" + id, type: "PUT", data: JSON.stringify(entry)});
-}
-
-function remove(id) {
   $.ajax({url: "/entry/" + id, type: "DELETE"});
 }
