@@ -32,7 +32,7 @@ $(document).ready(function() {
                 </div>
                 <div class="col-7"></div>
                 <div class="col-2">
-                  <input id="date" type="text" class="form-control" value="` + new Date().toJSON().slice(0,10) + `"></input>
+                  <input id="datepicker" type="text" class="form-control" value="` + new Date().toJSON().slice(0,10) + `"></input>
                 </div>
               </div>
             </div>
@@ -40,10 +40,15 @@ $(document).ready(function() {
         </li>`);
     $("input,select").off("change");
     $("input,select").change(addOrUpdate);
+    $("remove").off("click");
+    $("remove").click(remove);
+    $("#datepicker").datetimepicker({format: 'YYYY-MM-DD'}).on("dp.change", addOrUpdate);
   });
 
   $("input,select").change(addOrUpdate);
-  $("#remove").click(remove)
+  $("#remove").click(remove);
+
+  $(".datepicker").datetimepicker({format: 'YYYY-MM-DD'}).on("dp.change", addOrUpdate);
 });
 
 
