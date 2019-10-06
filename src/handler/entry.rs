@@ -8,9 +8,9 @@ use crate::utils::*;
 // all routes are prefixed with /entry
 pub fn routes() -> Router {
     let mut router = Router::new();
-    router.put("/entry/:id", update_handler, "update entry");
-    router.post("/entry", add_handler, "add entry");
-    router.delete("/entry/:id", delete_handler, "delete entry");
+    router.put("/:id", update_handler, "update entry");
+    router.post("/", add_handler, "add entry");
+    router.delete("/:id", delete_handler, "delete entry");
     router
 }
 
@@ -42,8 +42,9 @@ fn add_handler(req: &mut Request) -> IronResult<Response> {
         Ok(Some(item)) => {
             return diesel::insert_into(entries)
                 .values(&item)
-                .execute(&db)
-                .map(|_| Response::with(status::Ok))
+                .returning(id)
+                .get_result::<i32>(&db)
+                .map(|i| Response::with(json!(i).to_string()).set(status::Ok))
                 .map_err(|e| IronError::new(e, status::InternalServerError))
         }
         Ok(None) => Ok(Response::with(status::NotFound)),

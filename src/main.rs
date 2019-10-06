@@ -73,13 +73,13 @@ fn main() {
     let mut router = Router::new();
     router.get("/", index, "index");
     router.get("/week/:year/:week", week_handler, "week");
-    router.any("/entry/*", handler::entry::routes(), "entry API");
-    router.any("/print/*", handler::print::routes(), "print");
 
     let mut mount = Mount::new();
     mount
         .mount("/", router)
-        .mount("/static/", Static::new(Path::new("static")));
+        .mount("/entry", handler::entry::routes())
+        .mount("/print", handler::print::routes())
+        .mount("/static", Static::new(Path::new("static")));
 
     let mut chain = Chain::new(mount);
     chain.link_before(logger_before);

@@ -9,7 +9,7 @@ use crate::{models::Entry, utils::*};
 
 pub fn routes() -> Router {
     let mut router = Router::new();
-    router.get("/print/:year/:week", print_handler, "print");
+    router.get(":year/:week", print_handler, "print");
     router
 }
 
