@@ -42,7 +42,7 @@ $(document).ready(function() {
     $("input,select").change(addOrUpdate);
     $("remove").off("click");
     $("remove").click(remove);
-    $("#datepicker").datetimepicker({format: 'YYYY-MM-DD'}).on("dp.change", addOrUpdate);
+    $(".datepicker").datetimepicker({format: 'YYYY-MM-DD'}).on("dp.change", addOrUpdate);
   });
 
   $("input,select").change(addOrUpdate);
