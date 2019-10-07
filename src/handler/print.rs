@@ -63,6 +63,7 @@ fn print_handler(req: &mut Request) -> IronResult<Response> {
     context.insert("year".into(), json!(number.num_weeks() / 52 + 1));
     context.insert("date-start".into(), json!(weekdays.first().unwrap()));
     context.insert("date-end".into(), json!(weekdays.last().unwrap()));
+    context.insert("friday".into(), json!(weekdays[4]));
 
     let mut resp = Response::new();
     resp.set_mut(Template::new("print", context))
