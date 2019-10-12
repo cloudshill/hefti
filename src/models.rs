@@ -21,3 +21,10 @@ pub struct EntryForm {
     pub logdate: NaiveDate,
     pub entry_type: String,
 }
+
+#[derive(Insertable, Identifiable, Queryable, AsChangeset, Clone, Debug, Serialize, Deserialize)]
+pub struct User {
+    pub id: i32,
+    pub name: String,
+    pub password: String,
+}
