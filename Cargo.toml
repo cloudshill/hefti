@@ -19,6 +19,9 @@ handlebars = "^2.0"
 handlebars-iron = "0.28"
 logger = "0.4"
 bodyparser = "0.8"
+secure-session="0.3"
+urlencoded="0.6"
+cookie = "0.12"
 
 dotenv = "0.14"
 diesel = { version = "1.4", features = ["extras", "postgres"] }
@@ -27,3 +30,6 @@ chrono = { version = "0.4", features = ["serde"] }
 serde = "1.0"
 serde_derive = "1.0"
 serde_json = "1.0"
+
+rust-crypto="^0.2"
+lazy_static="*"

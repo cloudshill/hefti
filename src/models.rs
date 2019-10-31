@@ -28,3 +28,10 @@ pub struct User {
     pub name: String,
     pub password: String,
 }
+
+#[derive(Insertable, Identifiable, Queryable, AsChangeset, Clone, Debug, Serialize, Deserialize)]
+pub struct Session {
+    pub id: i32,
+    pub user_id: i32,
+    pub key: String,
+}

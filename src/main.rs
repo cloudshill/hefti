@@ -3,6 +3,9 @@ extern crate log;
 extern crate env_logger;
 
 #[macro_use]
+extern crate lazy_static;
+
+#[macro_use]
 extern crate diesel;
 extern crate dotenv;
 #[macro_use]
@@ -13,6 +16,7 @@ extern crate serde;
 extern crate serde_json;
 
 extern crate bodyparser;
+extern crate cookie;
 extern crate handlebars;
 extern crate handlebars_iron as hbs;
 extern crate iron;
@@ -21,6 +25,7 @@ extern crate mount;
 extern crate persistent;
 extern crate router;
 extern crate staticfile;
+extern crate urlencoded;
 
 use std::{env, path::Path};
 
@@ -30,21 +35,22 @@ use diesel::{
     r2d2::{Builder, ConnectionManager},
 };
 use dotenv::dotenv;
-use serde_json::Map;
 
 use handlebars::Handlebars;
-use hbs::{DirectorySource, HandlebarsEngine, Template};
-use iron::{prelude::*, status};
+use hbs::{DirectorySource, HandlebarsEngine};
+use iron::{headers::ContentType, prelude::*, status};
 use logger::Logger;
 use mount::Mount;
 use persistent::{Read, State};
 use router::Router;
 use staticfile::Static;
 
+use self::middleware::bearer::Bearer;
 use self::models::*;
 use self::utils::*;
 
 mod handler;
+mod middleware;
 mod models;
 mod schema;
 mod utils;
@@ -71,68 +77,22 @@ fn main() {
     let (logger_before, logger_after) = Logger::new(None);
 
     let mut router = Router::new();
-    router.get("/", index, "index");
-    router.get("/week/:year/:week", week_handler, "week");
+    router.post("/login", handler::login::login, "login");
 
     let mut mount = Mount::new();
     mount
-        .mount("/", router)
-        .mount("/entry", handler::entry::routes())
+        .mount("/", Static::new(Path::new("static/index.html")))
+        .mount("/api/entry", handler::entry::routes())
         .mount("/print", handler::print::routes())
         .mount("/static", Static::new(Path::new("static")));
 
     let mut chain = Chain::new(mount);
     chain.link_before(logger_before);
     chain.link_before(Read::<bodyparser::MaxBodyLength>::one(MAX_BODY_LENGTH));
+    // chain.link_around(Bearer {});
     chain.link(State::<DatabasePool>::both(pool));
     chain.link_after(logger_after);
     chain.link_after(hbse);
 
     Iron::new(chain).http("localhost:8000").unwrap();
-}
-
-fn index(req: &mut Request) -> IronResult<Response> {
-    use self::schema::entries::dsl::*;
-
-    let db = get_db(req)?;
-    let mut context = Map::new();
-
-    let result = entries.load::<Entry>(&db).expect("Error loading entries");
-    context.insert("entrys".into(), json!(result));
-
-    let mut resp = Response::new();
-    resp.set_mut(Template::new("index", context))
-        .set_mut(status::Ok);
-
-    Ok(resp)
-}
-
-fn week_handler(req: &mut Request) -> IronResult<Response> {
-    use self::schema::entries::dsl::*;
-    let mut context = Map::new();
-
-    let ref router = req.extensions.get::<Router>().unwrap();
-
-    let week: u32 = router.find("week").unwrap().parse().unwrap();
-    let year: i32 = router.find("year").unwrap().parse().unwrap();
-    let weekdays = to_week_days(year, week);
-    trace!("weekdays {:#?}", weekdays);
-
-    let db = get_db(req)?;
-    let entrys = match entries
-        .filter(logdate.between(weekdays.first().unwrap(), weekdays.last().unwrap()))
-        .order_by(logdate)
-        .load::<Entry>(&db)
-    {
-        Ok(i) => i,
-        Err(e) => return Err(IronError::new(e, status::InternalServerError)),
-    };
-
-    context.insert("entrys".into(), json!(entrys));
-
-    let mut resp = Response::new();
-    resp.set_mut(Template::new("index", context))
-        .set_mut(status::Ok);
-
-    Ok(resp)
 }
