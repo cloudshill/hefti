@@ -126,7 +126,7 @@ viewEntry entry =
         , Grid.row []
             [ viewEntryField Col.xs3 (Input.value (entryTypeToString entry.entryType))
             , Grid.col [ Col.xs7 ] []
-            , viewEntryField Col.xs2 (Input.value (Debug.toString entry.spendTime))
+            , viewEntryField Col.xs2 (Input.value (String.fromInt entry.spendTime))
             ]
         , Button.button [ Button.danger, Button.block ] [ text "Delete" ]
         ]
