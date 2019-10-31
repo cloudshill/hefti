@@ -56,6 +56,8 @@ init _ =
 
 type Msg
     = GotEntry (Result Http.Error (List Entry))
+    | Add
+    | Remove Int
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -67,6 +69,22 @@ update msg model =
                     ( Success entry, Cmd.none )
 
                 Err _ ->
+                    ( Failure, Cmd.none )
+
+        Add ->
+            case model of
+                Success entries ->
+                    ( entries ++ [ Entry "" 0 Work "" 0 ] |> Success, Cmd.none )
+
+                _ ->
+                    ( Failure, Cmd.none )
+
+        Remove id ->
+            case model of
+                Success entries ->
+                    ( List.filter (\entry -> entry.id /= id) entries |> Success, Cmd.none )
+
+                _ ->
                     ( Failure, Cmd.none )
 
 
@@ -100,7 +118,7 @@ view model =
 
             Success entry ->
                 div []
-                    [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ] ] [ text "Add new" ]
+                    [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Add new" ]
                     , ListGroup.ul
                         (List.map (\e -> ListGroup.li [] [ viewEntry e ]) entry)
                     ]
@@ -128,7 +146,7 @@ viewEntry entry =
             , Grid.col [ Col.xs7 ] []
             , viewEntryField Col.xs2 (Input.value (String.fromInt entry.spendTime))
             ]
-        , Button.button [ Button.danger, Button.block ] [ text "Delete" ]
+        , Button.button [ Button.danger, Button.block, Button.onClick (Remove entry.id) ] [ text "Delete" ]
         ]
 
 
