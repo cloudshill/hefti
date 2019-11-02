@@ -159,23 +159,23 @@ view model =
 viewEntry : Entry -> Html Msg
 viewEntry entry =
     let
-        viewEntryField space field =
+        viewEntryField space kind field =
             Grid.col [ space ]
                 [ InputGroup.config
-                    (InputGroup.text [ field ])
+                    (kind [ field ])
                     |> InputGroup.attrs [ Spacing.mb3 ]
                     |> InputGroup.view
                 ]
     in
     div []
         [ Grid.row []
-            [ viewEntryField Col.xs10 (Input.value entry.title)
-            , viewEntryField Col.xs2 (Input.value entry.logdate)
+            [ viewEntryField Col.xs10 InputGroup.text (Input.value entry.title)
+            , viewEntryField Col.xs2 InputGroup.date (Input.value entry.logdate)
             ]
         , Grid.row []
-            [ viewEntryField Col.xs3 (Input.value (entryTypeToString entry.entryType))
+            [ viewEntryField Col.xs3 InputGroup.text (Input.value (entryTypeToString entry.entryType))
             , Grid.col [ Col.xs7 ] []
-            , viewEntryField Col.xs2 (Input.value (String.fromInt entry.spendTime))
+            , viewEntryField Col.xs2 InputGroup.number (Input.value (String.fromInt entry.spendTime))
             ]
         , Button.button [ Button.danger, Button.block, Button.onClick (Remove entry.id) ] [ text "Delete" ]
         ]
