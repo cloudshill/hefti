@@ -14,6 +14,7 @@ import Html.Attributes exposing (class, href, rel)
 import Http
 import Json.Decode exposing (Decoder, andThen, field, int, list, map5, string)
 import Json.Decode.Extra exposing (fromResult)
+import Json.Encode as Encode
 import List exposing (foldl, length, map)
 
 
@@ -57,12 +58,14 @@ init _ =
 type Msg
     = GotEntry (Result Http.Error (List Entry))
     | Add
+    | GotAdd (Result Http.Error Int)
     | Remove Int
+    | Removed (Result Http.Error ())
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
+    case Debug.log "" msg of
         GotEntry result ->
             case result of
                 Ok entry ->
@@ -72,20 +75,48 @@ update msg model =
                     ( Failure, Cmd.none )
 
         Add ->
-            case model of
-                Success entries ->
-                    ( entries ++ [ Entry "" 0 Work "" 0 ] |> Success, Cmd.none )
+            ( model
+            , Http.post
+                { url = "/api/entry"
+                , expect = Http.expectJson GotAdd int
+                , body = entryEncoder (Entry 0 "" Work "2019-10-10" 0) |> Encode.encode 0 |> Http.stringBody "application/json"
+                }
+            )
 
-                _ ->
-                    ( Failure, Cmd.none )
+        GotAdd result ->
+            updateWith model
+                (\entries -> ( entries ++ [ Entry 0 "" Work "" 0 ] |> Success, Cmd.none ))
 
         Remove id ->
             case model of
                 Success entries ->
-                    ( List.filter (\entry -> entry.id /= id) entries |> Success, Cmd.none )
+                    ( List.filter (\entry -> entry.id /= id) entries |> Success
+                    , Http.request
+                        { method = "DELETE"
+                        , headers = []
+                        , url = "/api/entry/" ++ String.fromInt id
+                        , body = Http.emptyBody
+                        , expect = Http.expectWhatever Removed
+                        , timeout = Nothing
+                        , tracker = Nothing
+                        }
+                    )
 
                 _ ->
-                    ( Failure, Cmd.none )
+                    ( model, Cmd.none )
+
+        Removed _ ->
+            ( model, Cmd.none )
+
+
+updateWith : Model -> (List Entry -> ( Model, Cmd Msg )) -> ( Model, Cmd Msg )
+updateWith model transformer =
+    case model of
+        Success entries ->
+            transformer entries
+
+        _ ->
+            ( Failure, Cmd.none )
 
 
 
@@ -151,8 +182,8 @@ viewEntry entry =
 
 
 type alias Entry =
-    { title : String
-    , id : Int
+    { id : Int
+    , title : String
     , entryType : EntryType
     , logdate : String
     , spendTime : Int
@@ -168,8 +199,8 @@ type EntryType
 entryDecoder : Decoder Entry
 entryDecoder =
     map5 Entry
-        (field "title" string)
         (field "id" int)
+        (field "title" string)
         (field "entry_type" entryTypeDecoder)
         (field "logdate" string)
         (field "spend_time" int)
@@ -206,3 +237,14 @@ entryTypeDecoder =
                     Result.Err ("Not valid pattern for decoder to Suit. Pattern: " ++ string)
     in
     string |> andThen (decodeToType >> fromResult)
+
+
+entryEncoder : Entry -> Encode.Value
+entryEncoder entry =
+    Encode.object
+        [ ( "id", Encode.int entry.id )
+        , ( "title", Encode.string entry.title )
+        , ( "entry_type", entryTypeToString entry.entryType |> Encode.string )
+        , ( "logdate", Encode.string entry.logdate )
+        , ( "spend_time", Encode.int entry.spendTime )
+        ]
