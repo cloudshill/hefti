@@ -4,6 +4,7 @@ import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
+import Bootstrap.General.HAlign as HAlign
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
@@ -12,6 +13,7 @@ import Bootstrap.Modal as Modal
 import Bootstrap.Utilities.Display as Display
 import Bootstrap.Utilities.Spacing as Spacing
 import Browser
+import Date
 import Html exposing (Html, div, node, pre, text)
 import Html.Attributes exposing (class, href, rel)
 import Http
@@ -20,6 +22,8 @@ import Json.Decode.Extra exposing (fromResult)
 import Json.Encode as Encode
 import List exposing (foldl, length, map)
 import Maybe
+import Task
+import Time exposing (Month(..))
 import Tuple
 
 
@@ -43,6 +47,8 @@ main =
 type alias Model =
     { entries : List Entry
     , modalEdit : ( Modal.Visibility, Entry )
+    , today : Date.Date
+    , weekNumberFilter : Int
     }
 
 
@@ -50,11 +56,16 @@ init : () -> ( Model, Cmd Msg )
 init _ =
     ( { entries = []
       , modalEdit = ( Modal.hidden, emptyEntry )
+      , today = Date.fromCalendarDate 2019 Jan 1
+      , weekNumberFilter = 0
       }
-    , Http.get
-        { url = "/api/entry"
-        , expect = Http.expectJson GotEntry (list entryDecoder)
-        }
+    , Cmd.batch
+        [ Http.get
+            { url = "/api/entry"
+            , expect = Http.expectJson GotEntry (list entryDecoder)
+            }
+        , Date.today |> Task.perform ReceiveDate
+        ]
     )
 
 
@@ -72,17 +83,23 @@ type Msg
     | SaveEntry Entry
     | CloseEdit (Result Http.Error ())
     | EditEntry EditMsg Entry String
+    | ReceiveDate Date.Date
+    | Filter String
 
 
 type EditMsg
     = Title
-    | Type
+    | Type EntryType
     | Logdate
     | SpendTime
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
+    let
+        newWithId m id =
+            Entry id "" Work (Date.format "yyyy-MM-dd" m.today) 0
+    in
     case Debug.log "" msg of
         GotEntry result ->
             case result of
@@ -97,20 +114,19 @@ update msg model =
             , Http.post
                 { url = "/api/entry"
                 , expect = Http.expectJson GotAdd int
-                , body = entryEncoder (Entry 0 "" Work "2019-10-10" 0) |> Encode.encode 0 |> Http.stringBody "application/json"
+                , body = entryEncoder (newWithId model 0) |> Encode.encode 0 |> Http.stringBody "application/json"
                 }
             )
 
         GotAdd result ->
-            ( case result of
+            case result of
                 Ok id ->
                     updateEntries model
-                        (\entries -> entries ++ [ Entry id "" Work "" 0 ])
+                        (\entries -> entries ++ [ newWithId model id ])
+                        |> update (ShowEdit (newWithId model id))
 
                 Err _ ->
-                    model
-            , Cmd.none
-            )
+                    ( model, Cmd.none )
 
         Remove id ->
             ( updateEntries model (\entries -> List.filter (\entry -> entry.id /= id) entries)
@@ -165,8 +181,8 @@ update msg model =
                         Title ->
                             { e | title = v }
 
-                        Type ->
-                            e
+                        Type new ->
+                            { e | entryType = new }
 
                         Logdate ->
                             { e | logdate = v }
@@ -178,6 +194,17 @@ update msg model =
                 | modalEdit = ( Tuple.first model.modalEdit, updateEntry kind entry value )
               }
             , Cmd.none
+            )
+
+        ReceiveDate date ->
+            ( { model | today = date }, Cmd.none )
+
+        Filter weekNumber ->
+            ( { model | weekNumberFilter = Maybe.withDefault 0 (String.toInt weekNumber) }
+            , Http.get
+                { url = "/api/entry/" ++ String.fromInt 2019 ++ "/" ++ weekNumber
+                , expect = Http.expectJson GotEntry (list entryDecoder)
+                }
             )
 
 
@@ -209,6 +236,7 @@ view model =
             []
         , div []
             [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Add new" ]
+            , InputGroup.config (InputGroup.number [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]) |> InputGroup.view
             , ListGroup.ul
                 (List.map (\e -> ListGroup.li [] [ viewEntry e ]) model.entries)
             ]
@@ -255,6 +283,12 @@ editModal option =
                 (kind attrs)
                 |> InputGroup.attrs [ Spacing.mb3 ]
                 |> InputGroup.view
+
+        radio entryType =
+            ButtonGroup.radioButton
+                (entry.entryType == entryType)
+                [ Button.primary, Button.onClick (EditEntry (Type entryType) entry "") ]
+                [ entryTypeToString entryType |> text ]
     in
     div []
         [ Modal.config (CloseEdit (Result.Ok ()))
@@ -269,9 +303,10 @@ editModal option =
                     [ Input.value entry.logdate
                     , Input.onInput (EditEntry Logdate entry)
                     ]
-                , viewEntryField InputGroup.text
-                    [ Input.value (entryTypeToString entry.entryType)
-                    , Input.onInput (EditEntry Type entry)
+                , ButtonGroup.radioButtonGroup [ ButtonGroup.attrs [ Spacing.mb3 ] ]
+                    [ radio Work
+                    , radio School
+                    , radio Training
                     ]
                 , viewEntryField InputGroup.number
                     [ Input.value (String.fromInt entry.spendTime)

@@ -9,6 +9,7 @@ use crate::utils::*;
 pub fn routes() -> Router {
     let mut router = Router::new();
     router.get("/", get_entries, "get entries");
+    router.get("/:year/:week", week_handler, "get week");
     router.put("/:id", update_handler, "update entry");
     router.post("/", add_handler, "add entry");
     router.delete("/:id", delete_handler, "delete entry");
