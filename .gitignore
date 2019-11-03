@@ -1,3 +1,4 @@
 target/
 .pijul/
 .env
+static/index.html

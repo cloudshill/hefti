@@ -1,12 +1,15 @@
-module Main exposing (Model(..), Msg(..), init, main, subscriptions, update, view)
+module Main exposing (Entry, EntryType(..), Model, Msg(..), entryDecoder, entryEncoder, entryTypeDecoder, entryTypeToString, init, main, subscriptions, update, updateEntries, view, viewEntry)
 
 import Bootstrap.Button as Button
+import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Form.Input as Input
 import Bootstrap.Form.InputGroup as InputGroup
 import Bootstrap.Grid as Grid
 import Bootstrap.Grid.Col as Col
 import Bootstrap.Grid.Row as Row
 import Bootstrap.ListGroup as ListGroup
+import Bootstrap.Modal as Modal
+import Bootstrap.Utilities.Display as Display
 import Bootstrap.Utilities.Spacing as Spacing
 import Browser
 import Html exposing (Html, div, node, pre, text)
@@ -16,6 +19,8 @@ import Json.Decode exposing (Decoder, andThen, field, int, list, map5, string)
 import Json.Decode.Extra exposing (fromResult)
 import Json.Encode as Encode
 import List exposing (foldl, length, map)
+import Maybe
+import Tuple
 
 
 
@@ -35,15 +40,17 @@ main =
 -- MODEL
 
 
-type Model
-    = Failure
-    | Loading
-    | Success (List Entry)
+type alias Model =
+    { entries : List Entry
+    , modalEdit : ( Modal.Visibility, Entry )
+    }
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Loading
+    ( { entries = []
+      , modalEdit = ( Modal.hidden, emptyEntry )
+      }
     , Http.get
         { url = "/api/entry"
         , expect = Http.expectJson GotEntry (list entryDecoder)
@@ -61,6 +68,17 @@ type Msg
     | GotAdd (Result Http.Error Int)
     | Remove Int
     | Removed (Result Http.Error ())
+    | ShowEdit Entry
+    | SaveEntry Entry
+    | CloseEdit (Result Http.Error ())
+    | EditEntry EditMsg Entry String
+
+
+type EditMsg
+    = Title
+    | Type
+    | Logdate
+    | SpendTime
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -69,10 +87,10 @@ update msg model =
         GotEntry result ->
             case result of
                 Ok entry ->
-                    ( Success entry, Cmd.none )
+                    ( updateEntries model (\_ -> entry), Cmd.none )
 
                 Err _ ->
-                    ( Failure, Cmd.none )
+                    ( model, Cmd.none )
 
         Add ->
             ( model
@@ -84,39 +102,88 @@ update msg model =
             )
 
         GotAdd result ->
-            updateWith model
-                (\entries -> ( entries ++ [ Entry 0 "" Work "" 0 ] |> Success, Cmd.none ))
+            ( case result of
+                Ok id ->
+                    updateEntries model
+                        (\entries -> entries ++ [ Entry id "" Work "" 0 ])
+
+                Err _ ->
+                    model
+            , Cmd.none
+            )
 
         Remove id ->
-            case model of
-                Success entries ->
-                    ( List.filter (\entry -> entry.id /= id) entries |> Success
-                    , Http.request
-                        { method = "DELETE"
-                        , headers = []
-                        , url = "/api/entry/" ++ String.fromInt id
-                        , body = Http.emptyBody
-                        , expect = Http.expectWhatever Removed
-                        , timeout = Nothing
-                        , tracker = Nothing
-                        }
-                    )
-
-                _ ->
-                    ( model, Cmd.none )
+            ( updateEntries model (\entries -> List.filter (\entry -> entry.id /= id) entries)
+            , Http.request
+                { method = "DELETE"
+                , headers = []
+                , url = "/api/entry/" ++ String.fromInt id
+                , body = Http.emptyBody
+                , expect = Http.expectWhatever Removed
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+            )
 
         Removed _ ->
             ( model, Cmd.none )
 
+        ShowEdit entry ->
+            ( { model | modalEdit = ( Modal.shown, entry ) }, Cmd.none )
 
-updateWith : Model -> (List Entry -> ( Model, Cmd Msg )) -> ( Model, Cmd Msg )
-updateWith model transformer =
-    case model of
-        Success entries ->
-            transformer entries
+        CloseEdit entry ->
+            ( { model | modalEdit = ( Modal.hidden, emptyEntry ) }, Cmd.none )
 
-        _ ->
-            ( Failure, Cmd.none )
+        SaveEntry entry ->
+            ( updateEntries model
+                (\entries ->
+                    List.map
+                        (\e ->
+                            if e.id == entry.id then
+                                entry
+
+                            else
+                                e
+                        )
+                        entries
+                )
+            , Http.request
+                { method = "PUT"
+                , headers = []
+                , url = "/api/entry/" ++ String.fromInt entry.id
+                , body = entryEncoder entry |> Encode.encode 0 |> Http.stringBody "application/json"
+                , expect = Http.expectWhatever CloseEdit
+                , timeout = Nothing
+                , tracker = Nothing
+                }
+            )
+
+        EditEntry kind entry value ->
+            let
+                updateEntry k e v =
+                    case k of
+                        Title ->
+                            { e | title = v }
+
+                        Type ->
+                            e
+
+                        Logdate ->
+                            { e | logdate = v }
+
+                        SpendTime ->
+                            { e | spendTime = Maybe.withDefault 0 (String.toInt v) }
+            in
+            ( { model
+                | modalEdit = ( Tuple.first model.modalEdit, updateEntry kind entry value )
+              }
+            , Cmd.none
+            )
+
+
+updateEntries : Model -> (List Entry -> List Entry) -> Model
+updateEntries model transformer =
+    { model | entries = transformer model.entries }
 
 
 
@@ -140,45 +207,107 @@ view model =
             , href "/static/css/bootstrap.min.css"
             ]
             []
-        , case model of
-            Failure ->
-                text "I was unable to load the entries."
-
-            Loading ->
-                text "Loading..."
-
-            Success entry ->
-                div []
-                    [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Add new" ]
-                    , ListGroup.ul
-                        (List.map (\e -> ListGroup.li [] [ viewEntry e ]) entry)
-                    ]
+        , div []
+            [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Add new" ]
+            , ListGroup.ul
+                (List.map (\e -> ListGroup.li [] [ viewEntry e ]) model.entries)
+            ]
+        , editModal model.modalEdit
         ]
 
 
 viewEntry : Entry -> Html Msg
 viewEntry entry =
     let
-        viewEntryField space kind field =
+        viewEntryField space field =
             Grid.col [ space ]
-                [ InputGroup.config
-                    (kind [ field ])
-                    |> InputGroup.attrs [ Spacing.mb3 ]
-                    |> InputGroup.view
+                [ div [ Spacing.mb3 ] [ text field ]
                 ]
     in
     div []
         [ Grid.row []
-            [ viewEntryField Col.xs10 InputGroup.text (Input.value entry.title)
-            , viewEntryField Col.xs2 InputGroup.date (Input.value entry.logdate)
+            [ viewEntryField Col.xs10 entry.title
+            , viewEntryField Col.xs2 entry.logdate
             ]
         , Grid.row []
-            [ viewEntryField Col.xs3 InputGroup.text (Input.value (entryTypeToString entry.entryType))
+            [ viewEntryField Col.xs3 (entryTypeToString entry.entryType)
             , Grid.col [ Col.xs7 ] []
-            , viewEntryField Col.xs2 InputGroup.number (Input.value (String.fromInt entry.spendTime))
+            , viewEntryField Col.xs2 (String.fromInt entry.spendTime)
             ]
-        , Button.button [ Button.danger, Button.block, Button.onClick (Remove entry.id) ] [ text "Delete" ]
+        , ButtonGroup.buttonGroup []
+            [ ButtonGroup.button [ Button.primary, Button.onClick (ShowEdit entry) ] [ text "Edit" ]
+            , ButtonGroup.button [ Button.danger, Button.onClick (Remove entry.id) ] [ text "Delete" ]
+            ]
         ]
+
+
+editModal : ( Modal.Visibility, Entry ) -> Html Msg
+editModal option =
+    let
+        visibility =
+            Tuple.first option
+
+        entry =
+            Tuple.second option
+
+        viewEntryField kind attrs =
+            InputGroup.config
+                (kind attrs)
+                |> InputGroup.attrs [ Spacing.mb3 ]
+                |> InputGroup.view
+    in
+    div []
+        [ Modal.config (CloseEdit (Result.Ok ()))
+            |> Modal.hideOnBackdropClick True
+            |> Modal.h3 [] [ text "Edit Entry" ]
+            |> Modal.body []
+                [ viewEntryField InputGroup.text
+                    [ Input.value entry.title
+                    , Input.onInput (EditEntry Title entry)
+                    ]
+                , viewEntryField InputGroup.date
+                    [ Input.value entry.logdate
+                    , Input.onInput (EditEntry Logdate entry)
+                    ]
+                , viewEntryField InputGroup.text
+                    [ Input.value (entryTypeToString entry.entryType)
+                    , Input.onInput (EditEntry Type entry)
+                    ]
+                , viewEntryField InputGroup.number
+                    [ Input.value (String.fromInt entry.spendTime)
+                    , Input.onInput (EditEntry SpendTime entry)
+                    ]
+                ]
+            |> Modal.footer []
+                [ Button.button [ Button.outlinePrimary, Button.onClick (SaveEntry entry) ] [ text "Save" ] ]
+            |> Modal.view visibility
+        ]
+
+
+
+-- viewEntry : Entry -> Html Msg
+-- viewEntry entry =
+--     let
+--         viewEntryField space kind field =
+--             Grid.col [ space ]
+--                 [ InputGroup.config
+--                     (kind [ field ])
+--                     |> InputGroup.attrs [ Spacing.mb3 ]
+--                     |> InputGroup.view
+--                 ]
+--     in
+--     div []
+--         [ Grid.row []
+--             [ viewEntryField Col.xs10 InputGroup.text (Input.value entry.title)
+--             , viewEntryField Col.xs2 InputGroup.date (Input.value entry.logdate)
+--             ]
+--         , Grid.row []
+--             [ viewEntryField Col.xs3 InputGroup.text (Input.value (entryTypeToString entry.entryType))
+--             , Grid.col [ Col.xs7 ] []
+--             , viewEntryField Col.xs2 InputGroup.number (Input.value (String.fromInt entry.spendTime))
+--             ]
+--         , Button.button [ Button.danger, Button.block, Button.onClick (Remove entry.id) ] [ text "Delete" ]
+--         ]
 
 
 type alias Entry =
@@ -194,6 +323,11 @@ type EntryType
     = Work
     | School
     | Training
+
+
+emptyEntry : Entry
+emptyEntry =
+    Entry 0 "" Work "" 0
 
 
 entryDecoder : Decoder Entry
