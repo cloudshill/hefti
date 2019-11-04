@@ -234,13 +234,20 @@ view model =
             , href "/static/css/bootstrap.min.css"
             ]
             []
-        , div [ Spacing.mb3 ]
-            [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Add new" ]
-            , InputGroup.config
-                (InputGroup.number
-                    [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter, Input.attrs [ Spacing.mb3 ] ]
+        , div []
+            [ Grid.row []
+                (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
+                    [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Neu" ]
+                    , InputGroup.config
+                        (InputGroup.number
+                            [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]
+                        )
+                        |> InputGroup.predecessors [ InputGroup.span [] [ text "Kalenderwoche" ] ]
+                        |> InputGroup.view
+                    , Html.span [] [ List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
+                    , Html.span [] [ 40 - List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
+                    ]
                 )
-                |> InputGroup.view
             , Grid.row []
                 (List.map
                     (\t ->
@@ -255,8 +262,6 @@ view model =
                     )
                     [ Work, Training, School ]
                 )
-            , div [] [ List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
-            , div [] [ 40 - List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
             ]
         , editModal model.modalEdit
         ]
@@ -301,8 +306,8 @@ viewEntry entry =
         , Grid.row []
             [ Grid.col []
                 [ ButtonGroup.buttonGroup []
-                    [ ButtonGroup.button [ Button.primary, Button.onClick (ShowEdit entry) ] [ text "Edit" ]
-                    , ButtonGroup.button [ Button.danger, Button.onClick (Remove entry.id) ] [ text "Delete" ]
+                    [ ButtonGroup.button [ Button.primary, Button.onClick (ShowEdit entry) ] [ text "Bearbeiten" ]
+                    , ButtonGroup.button [ Button.danger, Button.onClick (Remove entry.id) ] [ text "Löschen" ]
                     ]
                 ]
             , viewEntryField Col.xs2 (Date.weekday entry.logdate |> weekdayToString)
