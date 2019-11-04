@@ -239,6 +239,8 @@ view model =
             , InputGroup.config (InputGroup.number [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]) |> InputGroup.view
             , ListGroup.ul
                 (List.map (\e -> ListGroup.li [] [ viewEntry e ]) model.entries)
+            , div [] [ List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
+            , div [] [ 40 - List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
             ]
         , editModal model.modalEdit
         ]
@@ -317,32 +319,6 @@ editModal option =
                 [ Button.button [ Button.outlinePrimary, Button.onClick (SaveEntry entry) ] [ text "Save" ] ]
             |> Modal.view visibility
         ]
-
-
-
--- viewEntry : Entry -> Html Msg
--- viewEntry entry =
---     let
---         viewEntryField space kind field =
---             Grid.col [ space ]
---                 [ InputGroup.config
---                     (kind [ field ])
---                     |> InputGroup.attrs [ Spacing.mb3 ]
---                     |> InputGroup.view
---                 ]
---     in
---     div []
---         [ Grid.row []
---             [ viewEntryField Col.xs10 InputGroup.text (Input.value entry.title)
---             , viewEntryField Col.xs2 InputGroup.date (Input.value entry.logdate)
---             ]
---         , Grid.row []
---             [ viewEntryField Col.xs3 InputGroup.text (Input.value (entryTypeToString entry.entryType))
---             , Grid.col [ Col.xs7 ] []
---             , viewEntryField Col.xs2 InputGroup.number (Input.value (String.fromInt entry.spendTime))
---             ]
---         , Button.button [ Button.danger, Button.block, Button.onClick (Remove entry.id) ] [ text "Delete" ]
---         ]
 
 
 type alias Entry =
