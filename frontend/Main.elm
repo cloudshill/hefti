@@ -15,7 +15,7 @@ import Bootstrap.Utilities.Spacing as Spacing
 import Browser
 import Date
 import Html exposing (Html, div, node, pre, text)
-import Html.Attributes exposing (class, href, rel)
+import Html.Attributes as Attributes exposing (class, href, rel)
 import Http
 import Json.Decode exposing (Decoder, andThen, field, int, list, map5, string)
 import Json.Decode.Extra exposing (fromResult)
@@ -23,7 +23,7 @@ import Json.Encode as Encode
 import List exposing (foldl, length, map)
 import Maybe
 import Task
-import Time exposing (Month(..))
+import Time exposing (Month(..), Weekday(..))
 import Tuple
 
 
@@ -98,7 +98,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
         newWithId m id =
-            Entry id "" Work (Date.format "yyyy-MM-dd" m.today) 0
+            Entry id "" Work m.today 0
     in
     case Debug.log "" msg of
         GotEntry result ->
@@ -181,11 +181,11 @@ update msg model =
                         Title ->
                             { e | title = v }
 
-                        Type new ->
-                            { e | entryType = new }
+                        Type t ->
+                            { e | entryType = t }
 
                         Logdate ->
-                            { e | logdate = v }
+                            { e | logdate = Result.withDefault entry.logdate (Date.fromIsoString v) }
 
                         SpendTime ->
                             { e | spendTime = Maybe.withDefault 0 (String.toInt v) }
@@ -228,17 +228,33 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
-    Grid.container []
+    Grid.containerFluid []
         [ node "link"
             [ rel "stylesheet"
             , href "/static/css/bootstrap.min.css"
             ]
             []
-        , div []
+        , div [ Spacing.mb3 ]
             [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Add new" ]
-            , InputGroup.config (InputGroup.number [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]) |> InputGroup.view
-            , ListGroup.ul
-                (List.map (\e -> ListGroup.li [] [ viewEntry e ]) model.entries)
+            , InputGroup.config
+                (InputGroup.number
+                    [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter, Input.attrs [ Spacing.mb3 ] ]
+                )
+                |> InputGroup.view
+            , Grid.row []
+                (List.map
+                    (\t ->
+                        Grid.col []
+                            [ ListGroup.ul
+                                (ListGroup.li [ ListGroup.info ] [ entryTypeToString t |> text ]
+                                    :: List.map
+                                        (\e -> ListGroup.li [] [ viewEntry e ])
+                                        (List.filter (\entry -> entry.entryType == t) model.entries)
+                                )
+                            ]
+                    )
+                    [ Work, Training, School ]
+                )
             , div [] [ List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
             , div [] [ 40 - List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
             ]
@@ -253,20 +269,43 @@ viewEntry entry =
             Grid.col [ space ]
                 [ div [ Spacing.mb3 ] [ text field ]
                 ]
+
+        weekdayToString weekday =
+            case weekday of
+                Mon ->
+                    "Montag"
+
+                Tue ->
+                    "Dinstag"
+
+                Wed ->
+                    "Mittwoch"
+
+                Thu ->
+                    "Donerstag"
+
+                Fri ->
+                    "Freitag"
+
+                Sat ->
+                    "Samstag"
+
+                Sun ->
+                    "Sonntag"
     in
     div []
         [ Grid.row []
-            [ viewEntryField Col.xs10 entry.title
-            , viewEntryField Col.xs2 entry.logdate
+            [ viewEntryField Col.xs11 entry.title
+            , viewEntryField Col.xs1 (String.fromInt entry.spendTime)
             ]
         , Grid.row []
-            [ viewEntryField Col.xs3 (entryTypeToString entry.entryType)
-            , Grid.col [ Col.xs7 ] []
-            , viewEntryField Col.xs2 (String.fromInt entry.spendTime)
-            ]
-        , ButtonGroup.buttonGroup []
-            [ ButtonGroup.button [ Button.primary, Button.onClick (ShowEdit entry) ] [ text "Edit" ]
-            , ButtonGroup.button [ Button.danger, Button.onClick (Remove entry.id) ] [ text "Delete" ]
+            [ Grid.col []
+                [ ButtonGroup.buttonGroup []
+                    [ ButtonGroup.button [ Button.primary, Button.onClick (ShowEdit entry) ] [ text "Edit" ]
+                    , ButtonGroup.button [ Button.danger, Button.onClick (Remove entry.id) ] [ text "Delete" ]
+                    ]
+                ]
+            , viewEntryField Col.xs2 (Date.weekday entry.logdate |> weekdayToString)
             ]
         ]
 
@@ -302,7 +341,7 @@ editModal option =
                     , Input.onInput (EditEntry Title entry)
                     ]
                 , viewEntryField InputGroup.date
-                    [ Input.value entry.logdate
+                    [ Input.value (Date.toIsoString entry.logdate)
                     , Input.onInput (EditEntry Logdate entry)
                     ]
                 , ButtonGroup.radioButtonGroup [ ButtonGroup.attrs [ Spacing.mb3 ] ]
@@ -325,7 +364,7 @@ type alias Entry =
     { id : Int
     , title : String
     , entryType : EntryType
-    , logdate : String
+    , logdate : Date.Date
     , spendTime : Int
     }
 
@@ -338,7 +377,7 @@ type EntryType
 
 emptyEntry : Entry
 emptyEntry =
-    Entry 0 "" Work "" 0
+    Entry 0 "" Work (Date.fromCalendarDate 1970 Jan 1) 0
 
 
 entryDecoder : Decoder Entry
@@ -347,7 +386,7 @@ entryDecoder =
         (field "id" int)
         (field "title" string)
         (field "entry_type" entryTypeDecoder)
-        (field "logdate" string)
+        (field "logdate" string |> andThen (Date.fromIsoString >> fromResult))
         (field "spend_time" int)
 
 
@@ -390,6 +429,6 @@ entryEncoder entry =
         [ ( "id", Encode.int entry.id )
         , ( "title", Encode.string entry.title )
         , ( "entry_type", entryTypeToString entry.entryType |> Encode.string )
-        , ( "logdate", Encode.string entry.logdate )
+        , ( "logdate", Encode.string (Date.format "yyyy-MM-dd" entry.logdate) )
         , ( "spend_time", Encode.int entry.spendTime )
         ]
