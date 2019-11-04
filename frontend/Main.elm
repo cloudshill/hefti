@@ -228,6 +228,16 @@ subscriptions model =
 
 view : Model -> Html Msg
 view model =
+    let
+        numberField option description =
+            InputGroup.config
+                (InputGroup.number option)
+                |> InputGroup.predecessors [ InputGroup.span [] [ text description ] ]
+                |> InputGroup.view
+
+        totalHours =
+            List.foldl (\e acc -> acc + e.spendTime) 0 model.entries
+    in
     Grid.containerFluid []
         [ node "link"
             [ rel "stylesheet"
@@ -235,17 +245,22 @@ view model =
             ]
             []
         , div []
-            [ Grid.row []
+            [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
                 (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
                     [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Neu" ]
-                    , InputGroup.config
-                        (InputGroup.number
-                            [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]
-                        )
-                        |> InputGroup.predecessors [ InputGroup.span [] [ text "Kalenderwoche" ] ]
-                        |> InputGroup.view
-                    , Html.span [] [ List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
-                    , Html.span [] [ 40 - List.foldl (\e acc -> acc + e.spendTime) 0 model.entries |> String.fromInt |> text ]
+                    , numberField
+                        [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]
+                        "Kalenderwoche"
+                    , numberField
+                        [ Input.value (totalHours |> String.fromInt)
+                        , Input.disabled True
+                        ]
+                        "Gesamt"
+                    , numberField
+                        [ Input.value (40 - totalHours |> String.fromInt)
+                        , Input.disabled True
+                        ]
+                        "Fehlend"
                     ]
                 )
             , Grid.row []
