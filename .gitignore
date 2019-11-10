@@ -2,3 +2,4 @@ target/
 .pijul/
 .env
 static/index.html
+elm-stuff
