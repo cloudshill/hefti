@@ -16,12 +16,13 @@ persistent = "0.4"
 staticfile = "0.5"
 mount = "0.4"
 handlebars = "^2.0"
-handlebars-iron = "0.28"
+hbs = { version = "0.28", package = "handlebars-iron" }
 logger = "0.4"
 bodyparser = "0.8"
 secure-session="0.3"
 urlencoded="0.6"
 cookie = "0.12"
+jsonwebtoken = "*"
 
 dotenv = "0.14"
 diesel = { version = "1.4", features = ["extras", "postgres"] }

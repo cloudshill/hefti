@@ -1,44 +1,17 @@
 #[macro_use]
-extern crate log;
-extern crate env_logger;
-
-#[macro_use]
-extern crate lazy_static;
-
-#[macro_use]
 extern crate diesel;
-extern crate dotenv;
-#[macro_use]
-extern crate serde_derive;
-extern crate chrono;
-extern crate serde;
-#[macro_use]
-extern crate serde_json;
-
-extern crate bodyparser;
-extern crate cookie;
-extern crate handlebars;
-extern crate handlebars_iron as hbs;
-extern crate iron;
-extern crate logger;
-extern crate mount;
-extern crate persistent;
-extern crate router;
-extern crate staticfile;
-extern crate urlencoded;
 
 use std::{env, path::Path};
 
 use diesel::{
     pg::PgConnection,
-    prelude::*,
     r2d2::{Builder, ConnectionManager},
 };
 use dotenv::dotenv;
 
 use handlebars::Handlebars;
 use hbs::{DirectorySource, HandlebarsEngine};
-use iron::{headers::ContentType, prelude::*, status};
+use iron::prelude::*;
 use logger::Logger;
 use mount::Mount;
 use persistent::{Read, State};
@@ -46,7 +19,6 @@ use router::Router;
 use staticfile::Static;
 
 use self::middleware::bearer::Bearer;
-use self::models::*;
 use self::utils::*;
 
 mod handler;
@@ -82,6 +54,7 @@ fn main() {
     let mut mount = Mount::new();
     mount
         .mount("/", Static::new(Path::new("static/index.html")))
+        .mount("/api/auth", handler::login::routes())
         .mount("/api/entry", handler::entry::routes())
         .mount("/print", handler::print::routes())
         .mount("/static", Static::new(Path::new("static")));
@@ -89,10 +62,10 @@ fn main() {
     let mut chain = Chain::new(mount);
     chain.link_before(logger_before);
     chain.link_before(Read::<bodyparser::MaxBodyLength>::one(MAX_BODY_LENGTH));
-    // chain.link_around(Bearer {});
+    chain.link_around(Bearer {});
     chain.link(State::<DatabasePool>::both(pool));
     chain.link_after(logger_after);
     chain.link_after(hbse);
 
-    Iron::new(chain).http("localhost:8000").unwrap();
+    Iron::new(chain).http("0.0.0.0:8000").unwrap();
 }

@@ -1,28 +1,39 @@
-use diesel::prelude::*;
 use iron::{headers, prelude::*, status, AroundMiddleware, Handler};
+use jsonwebtoken::{decode, Algorithm, Validation};
 
-use crate::utils::*;
+use crate::handler::login::Claims;
+
+// if the path matches one of these, no token valid token will be needed
+const NO_AUTH_REQUIRED: [&'static str; 2] = ["/", "api/auth/login"];
 
 pub struct Bearer;
 
 impl AroundMiddleware for Bearer {
     fn around(self, handler: Box<dyn Handler>) -> Box<Handler> {
-        use crate::schema::sessions::dsl::*;
-
         Box::new(move |req: &mut Request| -> IronResult<Response> {
-            let db = get_db(req)?;
+            let mut path = String::from("/");
+            path.push_str(req.url.path().join("/").as_str());
+
+            if NO_AUTH_REQUIRED.iter().any(|p| path.starts_with(p)) {
+                return handler.handle(req);
+            }
 
             match req.headers.get::<headers::Authorization<headers::Bearer>>() {
-                Some(baerer) => {
-                    if sessions
-                        .select(diesel::dsl::count_star())
-                        .filter(key.eq(&baerer.token))
-                        .first(&db)
-                        .and_then(|n: i64| Ok(n >= 1))
-                        .unwrap_or(false)
-                    {
-                        return handler.handle(req);
-                    }
+                Some(bearer) => {
+                    dbg!(&bearer);
+                    match decode::<Claims>(
+                        bearer.token.as_ref(),
+                        "secret".as_ref(),
+                        &Validation::new(Algorithm::HS256),
+                    ) {
+                        Ok(token) => {
+                            req.extensions.insert::<Claims>(token.claims);
+                            return handler.handle(req);
+                        }
+                        Err(e) => {
+                            println!("{}", e);
+                        }
+                    };
                 }
                 _ => {}
             };

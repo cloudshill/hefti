@@ -3,6 +3,7 @@ use diesel::prelude::*;
 use hbs::Template;
 use iron::{prelude::*, status};
 use router::Router;
+use serde_json::json;
 use serde_json::Map;
 
 use crate::{models::Entry, utils::*};

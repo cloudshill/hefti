@@ -1,5 +1,6 @@
-use super::schema::*;
+use crate::schema::*;
 use chrono::prelude::*;
+use serde_derive::{Deserialize, Serialize};
 
 #[derive(Insertable, Identifiable, Queryable, AsChangeset, Clone, Debug, Serialize, Deserialize)]
 #[table_name = "entries"]

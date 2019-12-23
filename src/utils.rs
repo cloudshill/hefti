@@ -5,6 +5,7 @@ use diesel::{
 };
 use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
 use iron::{prelude::*, status, typemap::Key};
+use log::*;
 use persistent::State;
 
 pub struct DatabasePool;

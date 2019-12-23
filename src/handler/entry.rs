@@ -1,6 +1,8 @@
 use diesel::prelude::*;
 use iron::{headers::ContentType, prelude::*, status};
+use log::*;
 use router::Router;
+use serde_json::json;
 
 use crate::models::{Entry, EntryForm};
 use crate::utils::*;
