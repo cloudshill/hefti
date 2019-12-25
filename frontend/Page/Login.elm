@@ -4,6 +4,15 @@ module Page.Login exposing (Model, Msg, init, subscriptions, toSession, update, 
 -}
 
 import Api exposing (Cred)
+import Bootstrap.Alert as Alert
+import Bootstrap.Button as Button
+import Bootstrap.Form as Form
+import Bootstrap.Form.Input as Input
+import Bootstrap.Form.InputGroup as InputGroup
+import Bootstrap.Grid as Grid
+import Bootstrap.Grid.Col as Col
+import Bootstrap.Grid.Row as Row
+import Bootstrap.Utilities.Spacing as Spacing
 import Browser.Navigation as Nav
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -29,37 +38,13 @@ type alias Model =
     }
 
 
-{-| Recording validation problems on a per-field basis facilitates displaying
-them inline next to the field where the error occurred.
-
-I implemented it this way out of habit, then realized the spec called for
-displaying all the errors at the top. I thought about simplifying it, but then
-figured it'd be useful to show how I would normally model this data - assuming
-the intended UX was to render errors per field.
-
-(The other part of this is having a view function like this:
-
-viewFieldErrors : ValidatedField -> List Problem -> Html msg
-
-...and it filters the list of problems to render only InvalidEntry ones for the
-given ValidatedField. That way you can call this:
-
-viewFieldErrors Email problems
-
-...next to the `email` field, and call `viewFieldErrors Password problems`
-next to the `password` field, and so on.
-
-The `LoginError` should be displayed elsewhere, since it doesn't correspond to
-a particular field.
-
--}
 type Problem
     = InvalidEntry ValidatedField String
     | ServerError String
 
 
 type alias Form =
-    { email : String
+    { username : String
     , password : String
     }
 
@@ -69,7 +54,7 @@ init session =
     ( { session = session
       , problems = []
       , form =
-            { email = ""
+            { username = ""
             , password = ""
             }
       }
@@ -85,15 +70,13 @@ view : Model -> { title : String, content : Html Msg }
 view model =
     { title = "Login"
     , content =
-        div [ class "cred-page" ]
-            [ div [ class "container page" ]
-                [ div [ class "row" ]
-                    [ div [ class "col-md-6 offset-md-3 col-xs-12" ]
-                        [ h1 [ class "text-xs-center" ] [ text "Sign in" ]
-                        , ul [ class "error-messages" ]
-                            (List.map viewProblem model.problems)
-                        , viewForm model.form
-                        ]
+        Grid.container []
+            [ Grid.row [ Row.centerMd ]
+                [ Grid.col [ Col.md6, Col.xs12 ]
+                    [ h1 [] [ text "Anmelden" ]
+                    , div []
+                        (List.map viewProblem model.problems)
+                    , viewForm model.form
                     ]
                 ]
             ]
@@ -111,32 +94,37 @@ viewProblem problem =
                 ServerError str ->
                     str
     in
-    li [] [ text errorMessage ]
+    Alert.simpleWarning [] [ text errorMessage ]
 
 
 viewForm : Form -> Html Msg
 viewForm form =
-    Html.form [ onSubmit SubmittedForm ]
-        [ fieldset [ class "form-group" ]
-            [ input
-                [ class "form-control form-control-lg"
-                , placeholder "Email"
-                , onInput EnteredEmail
-                , value form.email
-                ]
-                []
+    Form.form [ onSubmit SubmittedForm ]
+        [ Form.group []
+            [ InputGroup.config
+                (InputGroup.text
+                    [ Input.placeholder "Username"
+                    , Input.onInput EnteredUsername
+                    , Input.value form.username
+                    ]
+                )
+                |> InputGroup.predecessors
+                    [ InputGroup.span []
+                        [ text "@" ]
+                    ]
+                |> InputGroup.attrs [ Spacing.mb3 ]
+                |> InputGroup.view
+            , InputGroup.config
+                (InputGroup.password
+                    [ Input.placeholder "Password"
+                    , Input.onInput EnteredPassword
+                    , Input.value form.password
+                    ]
+                )
+                |> InputGroup.attrs [ Spacing.mb3 ]
+                |> InputGroup.view
             ]
-        , fieldset [ class "form-group" ]
-            [ input
-                [ class "form-control form-control-lg"
-                , type_ "password"
-                , placeholder "Password"
-                , onInput EnteredPassword
-                , value form.password
-                ]
-                []
-            ]
-        , button [ class "btn btn-lg btn-primary pull-xs-right" ]
+        , Button.button [ Button.primary ]
             [ text "Sign in" ]
         ]
 
@@ -147,7 +135,7 @@ viewForm form =
 
 type Msg
     = SubmittedForm
-    | EnteredEmail String
+    | EnteredUsername String
     | EnteredPassword String
     | CompletedLogin (Result (Error String) ( Http.Metadata, Viewer ))
     | GotSession Session
@@ -168,8 +156,8 @@ update msg model =
                     , Cmd.none
                     )
 
-        EnteredEmail email ->
-            updateForm (\form -> { form | email = email }) model
+        EnteredUsername username ->
+            updateForm (\form -> { form | username = username }) model
 
         EnteredPassword password ->
             updateForm (\form -> { form | password = password }) model
@@ -258,8 +246,8 @@ validateField (Trimmed form) field =
     List.map (InvalidEntry field) <|
         case field of
             Email ->
-                if String.isEmpty form.email then
-                    [ "email can't be blank." ]
+                if String.isEmpty form.username then
+                    [ "username can't be blank." ]
 
                 else
                     []
@@ -278,7 +266,7 @@ Instead, trim only on submit.
 trimFields : Form -> TrimmedForm
 trimFields form =
     Trimmed
-        { email = String.trim form.email
+        { username = String.trim form.username
         , password = String.trim form.password
         }
 
@@ -286,7 +274,7 @@ trimFields form =
 encodeForm : TrimmedForm -> Value
 encodeForm (Trimmed form) =
     Encode.object
-        [ ( "email", Encode.string form.email )
+        [ ( "username", Encode.string form.username )
         , ( "password", Encode.string form.password )
         ]
 

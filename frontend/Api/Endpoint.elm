@@ -52,7 +52,7 @@ url : List String -> List QueryParameter -> Endpoint
 url paths queryParams =
     -- NOTE: Url.Builder takes care of percent-encoding special URL characters.
     -- See https://package.elm-lang.org/packages/elm/url/latest/Url#percentEncode
-    Url.Builder.crossOrigin "/"
+    Url.Builder.crossOrigin "http://localhost:8000"
         ("api" :: paths)
         queryParams
         |> Endpoint
@@ -64,4 +64,4 @@ url paths queryParams =
 
 login : Endpoint
 login =
-    url [ "login" ] []
+    url [ "auth", "login" ] []
