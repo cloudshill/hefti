@@ -2,11 +2,12 @@ module Main exposing (main)
 
 import Api exposing (Cred)
 import Avatar exposing (Avatar)
+import Bootstrap.Navbar as Navbar
 import Browser exposing (Document)
 import Browser.Navigation as Nav
 import Html exposing (..)
 import Json.Decode as Decode exposing (Value)
-import Page exposing (Page)
+import Page
 import Page.Blank as Blank
 import Page.Home as Home
 import Page.Login as Login
@@ -41,8 +42,17 @@ type Model
 
 init : Maybe Viewer -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init maybeViewer url navKey =
-    changeRouteTo (Route.fromUrl url)
-        (Redirect (Session.fromViewer navKey maybeViewer))
+    let
+        ( navbarState, navbarCmd ) =
+            Navbar.initialState GotNavbar
+
+        ( model, msg ) =
+            changeRouteTo (Route.fromUrl url)
+                (Redirect (Session.fromViewer navbarState navKey maybeViewer))
+    in
+    ( model
+    , Cmd.batch [ msg, navbarCmd ]
+    )
 
 
 
@@ -55,27 +65,30 @@ view model =
         viewer =
             Session.viewer (toSession model)
 
-        viewPage page toMsg config =
+        navbarState =
+            Session.navState <| toSession model
+
+        viewPage toMsg config =
             let
                 { title, body } =
-                    Page.view viewer page config
+                    Page.view config
             in
             { title = title
-            , body = List.map (Html.map toMsg) body
+            , body = Page.viewHeader GotNavbar navbarState viewer :: List.map (Html.map toMsg) body
             }
     in
     case model of
         Redirect _ ->
-            Page.view viewer Page.Other Blank.view
+            Page.view Blank.view
 
         NotFound _ ->
-            Page.view viewer Page.Other NotFound.view
+            Page.view NotFound.view
 
         Home home ->
-            viewPage Page.Home GotHomeMsg (Home.view home)
+            viewPage GotHomeMsg (Home.view home)
 
         Login login ->
-            viewPage Page.Other GotLoginMsg (Login.view login)
+            viewPage GotLoginMsg (Login.view login)
 
 
 
@@ -88,6 +101,7 @@ type Msg
     | GotHomeMsg Home.Msg
     | GotLoginMsg Login.Msg
     | GotSession Session
+    | GotNavbar Navbar.State
 
 
 toSession : Model -> Session
@@ -193,18 +207,21 @@ updateWith toModel toMsg model ( subModel, subCmd ) =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    case model of
-        NotFound _ ->
-            Sub.none
+    Sub.batch
+        [ case model of
+            NotFound _ ->
+                Sub.none
 
-        Redirect _ ->
-            Session.changes GotSession (Session.navKey (toSession model))
+            Redirect _ ->
+                Session.changes GotSession (Session.navState (toSession model)) (Session.navKey (toSession model))
 
-        Home home ->
-            Sub.map GotHomeMsg (Home.subscriptions home)
+            Home home ->
+                Sub.map GotHomeMsg (Home.subscriptions home)
 
-        Login login ->
-            Sub.map GotLoginMsg (Login.subscriptions login)
+            Login login ->
+                Sub.map GotLoginMsg (Login.subscriptions login)
+        , Navbar.subscriptions (Session.navState (toSession model)) GotNavbar
+        ]
 
 
 

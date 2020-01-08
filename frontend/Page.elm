@@ -1,7 +1,8 @@
-module Page exposing (Page(..), view, viewErrors)
+module Page exposing (view, viewErrors, viewHeader)
 
 import Api exposing (Cred)
 import Avatar
+import Bootstrap.Navbar as Navbar
 import Browser exposing (Document)
 import Html exposing (Html, a, button, div, footer, i, img, li, nav, p, span, text, ul)
 import Html.Attributes exposing (class, classList, href, style)
@@ -13,23 +14,6 @@ import Username exposing (Username)
 import Viewer exposing (Viewer)
 
 
-{-| Determines which navbar link (if any) will be rendered as active.
-
-Note that we don't enumerate every page here, because the navbar doesn't
-have links for every page. Anything that's not part of the navbar falls
-under Other.
-
--}
-type Page
-    = Other
-    | Home
-    | Login
-    | Register
-    | Settings
-    | Profile Username
-    | NewArticle
-
-
 {-| Take a page's Html and frames it with a header and footer.
 
 The caller provides the current user, so we can display in either
@@ -39,75 +23,21 @@ isLoading is for determining whether we should show a loading spinner
 in the header. (This comes up during slow page transitions.)
 
 -}
-view : Maybe Viewer -> Page -> { title : String, content : Html msg } -> Document msg
-view maybeViewer page { title, content } =
+view : { title : String, content : Html msg } -> Document msg
+view { title, content } =
     { title = title ++ " - Hefti"
-    , body = viewHeader page maybeViewer :: content :: [ viewFooter ]
+    , body = content :: []
     }
 
 
-viewHeader : Page -> Maybe Viewer -> Html msg
-viewHeader page maybeViewer =
-    nav [ class "navbar navbar-light" ]
-        [ div [ class "container" ]
-            [ a [ class "navbar-brand", Route.href Route.Home ]
-                [ text "conduit" ]
-            , ul [ class "nav navbar-nav pull-xs-right" ] <|
-                navbarLink page Route.Home [ text "Home" ]
-                    :: viewMenu page maybeViewer
-            ]
-        ]
-
-
-viewMenu : Page -> Maybe Viewer -> List (Html msg)
-viewMenu page maybeViewer =
-    let
-        linkTo =
-            navbarLink page
-    in
-    case maybeViewer of
-        Just viewer ->
-            let
-                username =
-                    Viewer.username viewer
-
-                avatar =
-                    Viewer.avatar viewer
-            in
-            [ linkTo Route.Logout [ text "Sign out" ] ]
-
-        Nothing ->
-            [ linkTo Route.Login [ text "Sign in" ] ]
-
-
-viewFooter : Html msg
-viewFooter =
-    footer []
-        [ div [ class "container" ]
-            [ a [ class "logo-font", href "/" ] [ text "conduit" ]
-            , span [ class "attribution" ]
-                [ text "Code licensed under BSD." ]
-            ]
-        ]
-
-
-navbarLink : Page -> Route -> List (Html msg) -> Html msg
-navbarLink page route linkContent =
-    li [ classList [ ( "nav-item", True ), ( "active", isActive page route ) ] ]
-        [ a [ class "nav-link", Route.href route ] linkContent ]
-
-
-isActive : Page -> Route -> Bool
-isActive page route =
-    case ( page, route ) of
-        ( Home, Route.Home ) ->
-            True
-
-        ( Login, Route.Login ) ->
-            True
-
-        _ ->
-            False
+viewHeader : (Navbar.State -> msg) -> Navbar.State -> Maybe Viewer -> Html msg
+viewHeader msg state maybeViewer =
+    Navbar.config msg
+        |> Navbar.withAnimation
+        |> Navbar.dark
+        |> Navbar.brand [ Route.href Route.Home ]
+            [ text "Hefti" ]
+        |> Navbar.view state
 
 
 {-| Render dismissable errors. We use this all over the place!

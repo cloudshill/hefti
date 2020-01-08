@@ -26,16 +26,12 @@ import Username exposing (Username)
 
 
 type alias Model =
-    { session : Session
-    }
+    { session : Session }
 
 
 init : Session -> ( Model, Cmd Msg )
 init session =
-    ( { session = session
-      }
-    , Cmd.none
-    )
+    ( { session = session }, Cmd.none )
 
 
 
@@ -44,7 +40,7 @@ init session =
 
 view : Model -> { title : String, content : Html Msg }
 view model =
-    { title = "Hefti"
+    { title = "Home"
     , content =
         text "Hello there"
     }
@@ -81,7 +77,7 @@ update msg model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Session.changes GotSession (Session.navKey model.session)
+    Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
 
 
 

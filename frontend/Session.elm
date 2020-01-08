@@ -1,7 +1,8 @@
-module Session exposing (Session, changes, cred, fromViewer, navKey, viewer)
+module Session exposing (Session, changes, cred, fromViewer, navKey, navState, viewer)
 
 import Api exposing (Cred)
 import Avatar exposing (Avatar)
+import Bootstrap.Navbar as Navbar
 import Browser.Navigation as Nav
 import Json.Decode as Decode exposing (Decoder)
 import Json.Decode.Pipeline exposing (custom, required)
@@ -16,8 +17,8 @@ import Viewer exposing (Viewer)
 
 
 type Session
-    = LoggedIn Nav.Key Viewer
-    | Guest Nav.Key
+    = LoggedIn Navbar.State Nav.Key Viewer
+    | Guest Navbar.State Nav.Key
 
 
 
@@ -27,50 +28,60 @@ type Session
 viewer : Session -> Maybe Viewer
 viewer session =
     case session of
-        LoggedIn _ val ->
+        LoggedIn _ _ val ->
             Just val
 
-        Guest _ ->
+        Guest _ _ ->
             Nothing
 
 
 cred : Session -> Maybe Cred
 cred session =
     case session of
-        LoggedIn _ val ->
+        LoggedIn _ _ val ->
             Just (Viewer.cred val)
 
-        Guest _ ->
+        Guest _ _ ->
             Nothing
 
 
 navKey : Session -> Nav.Key
 navKey session =
     case session of
-        LoggedIn key _ ->
+        LoggedIn _ key _ ->
             key
 
-        Guest key ->
+        Guest _ key ->
             key
+
+
+navState : Session -> Navbar.State
+navState session =
+    case session of
+        LoggedIn state _ _ ->
+            state
+
+        Guest state _ ->
+            state
 
 
 
 -- CHANGES
 
 
-changes : (Session -> msg) -> Nav.Key -> Sub msg
-changes toMsg key =
-    Api.viewerChanges (\maybeViewer -> toMsg (fromViewer key maybeViewer)) Viewer.decoder
+changes : (Session -> msg) -> Navbar.State -> Nav.Key -> Sub msg
+changes toMsg state key =
+    Api.viewerChanges (\maybeViewer -> toMsg (fromViewer state key maybeViewer)) Viewer.decoder
 
 
-fromViewer : Nav.Key -> Maybe Viewer -> Session
-fromViewer key maybeViewer =
+fromViewer : Navbar.State -> Nav.Key -> Maybe Viewer -> Session
+fromViewer state key maybeViewer =
     -- It's stored in localStorage as a JSON String;
     -- first decode the Value as a String, then
     -- decode that String as JSON.
     case maybeViewer of
         Just viewerVal ->
-            LoggedIn key viewerVal
+            LoggedIn state key viewerVal
 
         Nothing ->
-            Guest key
+            Guest state key

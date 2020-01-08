@@ -197,7 +197,7 @@ updateForm transform model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Session.changes GotSession (Session.navKey model.session)
+    Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
 
 
 
