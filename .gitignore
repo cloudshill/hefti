@@ -1,5 +1,5 @@
 target/
 .pijul/
 .env
-static/index.html
 elm-stuff
+static/elm.js
