@@ -18,6 +18,7 @@ type Route
     | Root
     | Login
     | Logout
+    | Entry
 
 
 parser : Parser (Route -> a) a
@@ -26,6 +27,7 @@ parser =
         [ Parser.map Home Parser.top
         , Parser.map Login (s "login")
         , Parser.map Logout (s "logout")
+        , Parser.map Entry (s "entry")
         ]
 
 
@@ -75,3 +77,6 @@ routeToPieces page =
 
         Logout ->
             [ "logout" ]
+
+        Entry ->
+            [ "entry" ]

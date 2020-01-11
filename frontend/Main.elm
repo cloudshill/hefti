@@ -9,6 +9,7 @@ import Html exposing (..)
 import Json.Decode as Decode exposing (Value)
 import Page
 import Page.Blank as Blank
+import Page.Entry as Entry
 import Page.Home as Home
 import Page.Login as Login
 import Page.NotFound as NotFound
@@ -34,6 +35,7 @@ type Model
     | NotFound Session
     | Home Home.Model
     | Login Login.Model
+    | Entry Entry.Model
 
 
 
@@ -90,6 +92,9 @@ view model =
         Login login ->
             viewPage GotLoginMsg (Login.view login)
 
+        Entry entry ->
+            viewPage GotEntryMsg (Entry.view entry)
+
 
 
 -- UPDATE
@@ -100,6 +105,7 @@ type Msg
     | ClickedLink Browser.UrlRequest
     | GotHomeMsg Home.Msg
     | GotLoginMsg Login.Msg
+    | GotEntryMsg Entry.Msg
     | GotSession Session
     | GotNavbar Navbar.State
 
@@ -118,6 +124,9 @@ toSession page =
 
         Login login ->
             Login.toSession login
+
+        Entry entry ->
+            Entry.toSession entry
 
 
 changeRouteTo : Maybe Route -> Model -> ( Model, Cmd Msg )
@@ -143,6 +152,10 @@ changeRouteTo maybeRoute model =
         Just Route.Login ->
             Login.init session
                 |> updateWith Login GotLoginMsg model
+
+        Just Route.Entry ->
+            Entry.init session
+                |> updateWith Entry GotEntryMsg model
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -184,9 +197,18 @@ update msg model =
             Home.update subMsg home
                 |> updateWith Home GotHomeMsg model
 
+        ( GotEntryMsg subMsg, Entry entry ) ->
+            Entry.update subMsg entry
+                |> updateWith Entry GotEntryMsg model
+
         ( GotSession session, Redirect _ ) ->
             ( Redirect session
             , Route.replaceUrl (Session.navKey session) Route.Home
+            )
+
+        ( GotNavbar state, _ ) ->
+            ( updateNavbarState state model
+            , Cmd.none
             )
 
         ( _, _ ) ->
@@ -199,6 +221,29 @@ updateWith toModel toMsg model ( subModel, subCmd ) =
     ( toModel subModel
     , Cmd.map toMsg subCmd
     )
+
+
+updateNavbarState : Navbar.State -> Model -> Model
+updateNavbarState state model =
+    let
+        updatedSession session =
+            Session.changeNavState state session
+    in
+    case model of
+        Redirect session ->
+            Redirect <| updatedSession session
+
+        NotFound session ->
+            NotFound <| updatedSession session
+
+        Home home ->
+            Home (Home.updateSession (updatedSession (Home.toSession home)) home)
+
+        Login login ->
+            Login (Login.updateSession (updatedSession (Login.toSession login)) login)
+
+        Entry entry ->
+            Entry (Entry.updateSession (updatedSession (Entry.toSession entry)) entry)
 
 
 
@@ -220,6 +265,9 @@ subscriptions model =
 
             Login login ->
                 Sub.map GotLoginMsg (Login.subscriptions login)
+
+            Entry entry ->
+                Sub.map GotEntryMsg (Entry.subscriptions entry)
         , Navbar.subscriptions (Session.navState (toSession model)) GotNavbar
         ]
 

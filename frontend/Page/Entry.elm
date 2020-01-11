@@ -1,4 +1,4 @@
-module Page.Entry exposing (Entry, Model, Msg(..), emptyEntry, entryDecoder, toSession, update, view)
+module Page.Entry exposing (Entry, Model, Msg(..), emptyEntry, entryDecoder, init, subscriptions, toSession, update, updateSession, view)
 
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
@@ -41,6 +41,18 @@ type alias Model =
     }
 
 
+init : Session -> ( Model, Cmd Msg )
+init session =
+    ( { session = session
+      , entries = []
+      , modalEdit = ( Modal.hidden, emptyEntry )
+      , today = Date.fromCalendarDate 2000 Jan 1
+      , weekNumberFilter = 0
+      }
+    , Cmd.none
+    )
+
+
 
 -- UPDATE
 
@@ -57,6 +69,7 @@ type Msg
     | EditEntry EditMsg Entry String
     | ReceiveDate Date.Date
     | Filter String
+    | GotSession Session
 
 
 type EditMsg
@@ -179,6 +192,14 @@ update msg model =
                 }
             )
 
+        GotSession session ->
+            ( { model | session = session }, Cmd.none )
+
+
+updateSession : Session -> Model -> Model
+updateSession session model =
+    { model | session = session }
+
 
 updateEntries : Model -> (List Entry -> List Entry) -> Model
 updateEntries model transformer =
@@ -189,7 +210,7 @@ updateEntries model transformer =
 -- VIEW
 
 
-view : Model -> Html Msg
+view : Model -> { title : String, content : Html Msg }
 view model =
     let
         numberField option description =
@@ -201,43 +222,46 @@ view model =
         totalHours =
             List.foldl (\e acc -> acc + e.spendTime) 0 model.entries
     in
-    div []
-        [ div []
-            [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
-                (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
-                    [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Neu" ]
-                    , numberField
-                        [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]
-                        "Kalenderwoche"
-                    , numberField
-                        [ Input.value (totalHours |> String.fromInt)
-                        , Input.disabled True
-                        ]
-                        "Gesamt"
-                    , numberField
-                        [ Input.value (40 - totalHours |> String.fromInt)
-                        , Input.disabled True
-                        ]
-                        "Fehlend"
-                    ]
-                )
-            , Grid.row []
-                (List.map
-                    (\t ->
-                        Grid.col []
-                            [ ListGroup.ul
-                                (ListGroup.li [ ListGroup.info ] [ entryTypeToString t |> text ]
-                                    :: List.map
-                                        (\e -> ListGroup.li [] [ viewEntry e ])
-                                        (List.filter (\entry -> entry.entryType == t) model.entries)
-                                )
+    { title = "Entry"
+    , content =
+        div []
+            [ div []
+                [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+                    (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
+                        [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Neu" ]
+                        , numberField
+                            [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]
+                            "Kalenderwoche"
+                        , numberField
+                            [ Input.value (totalHours |> String.fromInt)
+                            , Input.disabled True
                             ]
+                            "Gesamt"
+                        , numberField
+                            [ Input.value (40 - totalHours |> String.fromInt)
+                            , Input.disabled True
+                            ]
+                            "Fehlend"
+                        ]
                     )
-                    [ Work, Training, School ]
-                )
-            , editModal model.modalEdit
+                , Grid.row []
+                    (List.map
+                        (\t ->
+                            Grid.col []
+                                [ ListGroup.ul
+                                    (ListGroup.li [ ListGroup.info ] [ entryTypeToString t |> text ]
+                                        :: List.map
+                                            (\e -> ListGroup.li [] [ viewEntry e ])
+                                            (List.filter (\entry -> entry.entryType == t) model.entries)
+                                    )
+                                ]
+                        )
+                        [ Work, Training, School ]
+                    )
+                , editModal model.modalEdit
+                ]
             ]
-        ]
+    }
 
 
 viewEntry : Entry -> Html Msg
@@ -286,6 +310,15 @@ viewEntry entry =
             , viewEntryField Col.xs2 (Date.weekday entry.logdate |> weekdayToString)
             ]
         ]
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
 
 
 editModal : ( Modal.Visibility, Entry ) -> Html Msg
@@ -355,7 +388,7 @@ type EntryType
 
 emptyEntry : Entry
 emptyEntry =
-    Entry 0 "" Work (Date.fromCalendarDate 1970 Jan 1) 0
+    Entry 0 "" Work (Date.fromCalendarDate 2000 Jan 1) 0
 
 
 entryDecoder : Decoder Entry

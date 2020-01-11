@@ -1,4 +1,4 @@
-module Page.Home exposing (Model, Msg, init, subscriptions, toSession, update, view)
+module Page.Home exposing (Model, Msg, init, subscriptions, toSession, update, updateSession, view)
 
 {-| The homepage. You can get here via either the / or /#/ routes.
 -}
@@ -69,6 +69,11 @@ update msg model =
     case msg of
         GotSession session ->
             ( { model | session = session }, Cmd.none )
+
+
+updateSession : Session -> Model -> Model
+updateSession session model =
+    { model | session = session }
 
 
 

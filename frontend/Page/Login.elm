@@ -1,4 +1,4 @@
-module Page.Login exposing (Model, Msg, init, subscriptions, toSession, update, view)
+module Page.Login exposing (Model, Msg, init, subscriptions, toSession, update, updateSession, view)
 
 {-| The login page.
 -}
@@ -181,6 +181,11 @@ update msg model =
             ( { model | session = session }
             , Route.replaceUrl (Session.navKey session) Route.Home
             )
+
+
+updateSession : Session -> Model -> Model
+updateSession session model =
+    { model | session = session }
 
 
 {-| Helper function for `update`. Updates the form and returns Cmd.none.

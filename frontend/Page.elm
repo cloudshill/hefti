@@ -26,7 +26,7 @@ in the header. (This comes up during slow page transitions.)
 view : { title : String, content : Html msg } -> Document msg
 view { title, content } =
     { title = title ++ " - Hefti"
-    , body = content :: []
+    , body = [ content ]
     }
 
 
@@ -35,8 +35,12 @@ viewHeader msg state maybeViewer =
     Navbar.config msg
         |> Navbar.withAnimation
         |> Navbar.dark
-        |> Navbar.brand [ Route.href Route.Home ]
-            [ text "Hefti" ]
+        |> Navbar.brand [ Route.href Route.Home ] [ text "Hefti" ]
+        |> Navbar.items
+            [ Navbar.itemLink [ Route.href Route.Entry ] [ text "Entry" ]
+            , Navbar.itemLink [ Route.href Route.Login ] [ text "Login" ]
+            , Navbar.itemLink [] [ text "test" ]
+            ]
         |> Navbar.view state
 
 

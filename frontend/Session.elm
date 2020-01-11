@@ -1,4 +1,4 @@
-module Session exposing (Session, changes, cred, fromViewer, navKey, navState, viewer)
+module Session exposing (Session, changeNavState, changes, cred, fromViewer, navKey, navState, viewer)
 
 import Api exposing (Cred)
 import Avatar exposing (Avatar)
@@ -72,6 +72,16 @@ navState session =
 changes : (Session -> msg) -> Navbar.State -> Nav.Key -> Sub msg
 changes toMsg state key =
     Api.viewerChanges (\maybeViewer -> toMsg (fromViewer state key maybeViewer)) Viewer.decoder
+
+
+changeNavState : Navbar.State -> Session -> Session
+changeNavState state session =
+    case session of
+        LoggedIn _ key v ->
+            LoggedIn state key v
+
+        Guest _ key ->
+            Guest state key
 
 
 fromViewer : Navbar.State -> Nav.Key -> Maybe Viewer -> Session
