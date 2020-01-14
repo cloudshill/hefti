@@ -38,8 +38,18 @@ viewHeader msg state maybeViewer =
         |> Navbar.brand [ Route.href Route.Home ] [ text "Hefti" ]
         |> Navbar.items
             [ Navbar.itemLink [ Route.href Route.Entry ] [ text "Entry" ]
-            , Navbar.itemLink [ Route.href Route.Login ] [ text "Login" ]
-            , Navbar.itemLink [] [ text "test" ]
+            ]
+        |> Navbar.customItems
+            [ Navbar.customItem
+                (div [ class "navbar-nav nav-item" ]
+                    [ case maybeViewer of
+                        Just viewer ->
+                            a [ Route.href Route.Logout, class "nav-link" ] [ text <| Username.toString <| Viewer.username viewer ]
+
+                        Nothing ->
+                            a [ Route.href Route.Login, class "nav-link" ] [ text "Login" ]
+                    ]
+                )
             ]
         |> Navbar.view state
 
