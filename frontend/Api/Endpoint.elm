@@ -1,7 +1,8 @@
-module Api.Endpoint exposing (Endpoint, login, request)
+module Api.Endpoint exposing (Endpoint, entry, login, newEntry, request, week)
 
 import CommentId exposing (CommentId)
 import Http
+import String
 import Url.Builder exposing (QueryParameter)
 import Username exposing (Username)
 
@@ -65,3 +66,18 @@ url paths queryParams =
 login : Endpoint
 login =
     url [ "auth", "login" ] []
+
+
+newEntry : Endpoint
+newEntry =
+    url [ "entry" ] []
+
+
+entry : Int -> Endpoint
+entry id =
+    url [ "entry" ] []
+
+
+week : Int -> Int -> Endpoint
+week year calenderWeek =
+    url [ "entry", String.fromInt year, String.fromInt calenderWeek ] []

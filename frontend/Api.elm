@@ -1,4 +1,4 @@
-port module Api exposing (Cred, addServerError, application, decodeErrors, delete, get, login, logout, post, put, storeCredWith, username, viewerChanges)
+port module Api exposing (Cred, Response, addServerError, application, decodeErrors, delete, get, login, logout, post, put, storeCredWith, username, viewerChanges)
 
 {-| This module is responsible for communicating to the Conduit API.
 
@@ -167,7 +167,11 @@ storageDecoder viewerDecoder =
 -- HTTP
 
 
-get : Endpoint -> Maybe Cred -> (Result (Error String) ( Http.Metadata, a ) -> msg) -> Decoder a -> Cmd msg
+type alias Response a =
+    Result (Error String) ( Http.Metadata, a )
+
+
+get : Endpoint -> Maybe Cred -> (Response a -> msg) -> Decoder a -> Cmd msg
 get url maybeCred expect decoder =
     Endpoint.request
         { method = "GET"
@@ -186,7 +190,7 @@ get url maybeCred expect decoder =
         }
 
 
-put : Endpoint -> Cred -> Body -> (Result (Error String) ( Http.Metadata, a ) -> msg) -> Decoder a -> Cmd msg
+put : Endpoint -> Cred -> Body -> (Response a -> msg) -> Decoder a -> Cmd msg
 put url cred body expect decoder =
     Endpoint.request
         { method = "PUT"
@@ -199,7 +203,7 @@ put url cred body expect decoder =
         }
 
 
-post : Endpoint -> Maybe Cred -> Body -> (Result (Error String) ( Http.Metadata, a ) -> msg) -> Decoder a -> Cmd msg
+post : Endpoint -> Maybe Cred -> Body -> (Response a -> msg) -> Decoder a -> Cmd msg
 post url maybeCred body expect decoder =
     Endpoint.request
         { method = "POST"
@@ -218,7 +222,7 @@ post url maybeCred body expect decoder =
         }
 
 
-delete : Endpoint -> Cred -> Body -> (Result (Error String) ( Http.Metadata, a ) -> msg) -> Decoder a -> Cmd msg
+delete : Endpoint -> Cred -> Body -> (Response a -> msg) -> Decoder a -> Cmd msg
 delete url cred body expect decoder =
     Endpoint.request
         { method = "DELETE"
@@ -231,16 +235,16 @@ delete url cred body expect decoder =
         }
 
 
-login : Http.Body -> (Result (Error String) ( Http.Metadata, a ) -> msg) -> Decoder (Cred -> a) -> Cmd msg
-login body expect decoder =
-    post Endpoint.login Nothing body expect (Decode.field "user" (decoderFromCred decoder))
-
-
 decoderFromCred : Decoder (Cred -> a) -> Decoder a
 decoderFromCred decoder =
     Decode.map2 (\fromCred cred -> fromCred cred)
         decoder
         credDecoder
+
+
+login : Http.Body -> (Result (Error String) ( Http.Metadata, a ) -> msg) -> Decoder (Cred -> a) -> Cmd msg
+login body expect decoder =
+    post Endpoint.login Nothing body expect (Decode.field "user" (decoderFromCred decoder))
 
 
 

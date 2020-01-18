@@ -1,5 +1,6 @@
-module Page.Entry exposing (Entry, Model, Msg(..), emptyEntry, entryDecoder, init, subscriptions, toSession, update, updateSession, view)
+module Page.Entry exposing (Model, Msg(..), emptyEntry, init, subscriptions, toSession, update, updateSession, view)
 
+import Api exposing (Cred)
 import Bootstrap.Button as Button
 import Bootstrap.ButtonGroup as ButtonGroup
 import Bootstrap.Form.Input as Input
@@ -14,9 +15,11 @@ import Bootstrap.Utilities.Display as Display
 import Bootstrap.Utilities.Spacing as Spacing
 import Browser
 import Date
+import Entry exposing (..)
 import Html exposing (Html, div, node, pre, text)
 import Html.Attributes as Attributes exposing (class, href, rel)
 import Http
+import Iso8601
 import Json.Decode exposing (Decoder, andThen, field, int, list, map5, string)
 import Json.Decode.Extra exposing (fromResult)
 import Json.Encode as Encode
@@ -24,7 +27,7 @@ import List exposing (foldl, length, map)
 import Maybe
 import Session exposing (Session)
 import Task
-import Time exposing (Month(..), Weekday(..))
+import Time exposing (Month(..), Posix, Weekday(..), Zone)
 import Tuple
 
 
@@ -36,7 +39,8 @@ type alias Model =
     { session : Session
     , entries : List Entry
     , modalEdit : ( Modal.Visibility, Entry )
-    , today : Date.Date
+    , today : Posix
+    , zone : Zone
     , weekNumberFilter : Int
     }
 
@@ -46,7 +50,8 @@ init session =
     ( { session = session
       , entries = []
       , modalEdit = ( Modal.hidden, emptyEntry )
-      , today = Date.fromCalendarDate 2000 Jan 1
+      , today = Time.millisToPosix 0
+      , zone = Time.utc
       , weekNumberFilter = 0
       }
     , Cmd.none
@@ -58,17 +63,18 @@ init session =
 
 
 type Msg
-    = GotEntry (Result Http.Error (List Entry))
-    | Add
-    | GotAdd (Result Http.Error Int)
-    | Remove Int
-    | Removed (Result Http.Error ())
+    = CompletedLoadEntries (Api.Response (List Entry))
+    | CompletedSave (Api.Response ())
+    | Add Cred
+    | GotAdd (Api.Response Int)
+    | Remove Cred Entry
+    | Removed (Api.Response ())
     | ShowEdit Entry
-    | SaveEntry Entry
-    | CloseEdit (Result Http.Error ())
+    | SaveEntry Cred Entry
+    | CloseEdit
     | EditEntry EditMsg Entry String
-    | ReceiveDate Date.Date
-    | Filter String
+    | GotTime Posix
+    | Filter Cred String
     | GotSession Session
 
 
@@ -82,48 +88,32 @@ type EditMsg
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     let
-        newWithId m id =
-            Entry id "" Work m.today 0
+        newWithId id =
+            Entry id "" Work model.today 0
     in
     case msg of
-        GotEntry result ->
-            case result of
-                Ok entry ->
-                    ( updateEntries model (\_ -> entry), Cmd.none )
+        CompletedLoadEntries (Ok entry) ->
+            ( updateEntries model (\_ -> entry |> Tuple.second), Cmd.none )
 
-                Err _ ->
-                    ( model, Cmd.none )
+        CompletedLoadEntries (Err _) ->
+            ( model, Cmd.none )
 
-        Add ->
+        Add cred ->
             ( model
-            , Http.post
-                { url = "/api/entry"
-                , expect = Http.expectJson GotAdd int
-                , body = entryEncoder (newWithId model 0) |> Encode.encode 0 |> Http.stringBody "application/json"
-                }
+            , add emptyEntry cred GotAdd
             )
 
-        GotAdd result ->
-            case result of
-                Ok id ->
-                    updateEntries model
-                        (\entries -> entries ++ [ newWithId model id ])
-                        |> update (ShowEdit (newWithId model id))
+        GotAdd (Ok ( _, id )) ->
+            updateEntries model
+                (\entries -> entries ++ [ newWithId id ])
+                |> update (ShowEdit (newWithId id))
 
-                Err _ ->
-                    ( model, Cmd.none )
+        GotAdd (Err _) ->
+            ( model, Cmd.none )
 
-        Remove id ->
-            ( updateEntries model (\entries -> List.filter (\entry -> entry.id /= id) entries)
-            , Http.request
-                { method = "DELETE"
-                , headers = []
-                , url = "/api/entry/" ++ String.fromInt id
-                , body = Http.emptyBody
-                , expect = Http.expectWhatever Removed
-                , timeout = Nothing
-                , tracker = Nothing
-                }
+        Remove cred entry ->
+            ( updateEntries model (\entries -> List.filter (\e -> e.id /= entry.id) entries)
+            , delete entry cred Removed
             )
 
         Removed _ ->
@@ -132,10 +122,10 @@ update msg model =
         ShowEdit entry ->
             ( { model | modalEdit = ( Modal.shown, entry ) }, Cmd.none )
 
-        CloseEdit entry ->
+        CloseEdit ->
             ( { model | modalEdit = ( Modal.hidden, emptyEntry ) }, Cmd.none )
 
-        SaveEntry entry ->
+        SaveEntry cred entry ->
             ( updateEntries model
                 (\entries ->
                     List.map
@@ -148,16 +138,11 @@ update msg model =
                         )
                         entries
                 )
-            , Http.request
-                { method = "PUT"
-                , headers = []
-                , url = "/api/entry/" ++ String.fromInt entry.id
-                , body = entryEncoder entry |> Encode.encode 0 |> Http.stringBody "application/json"
-                , expect = Http.expectWhatever CloseEdit
-                , timeout = Nothing
-                , tracker = Nothing
-                }
+            , Entry.update entry cred CompletedSave
             )
+
+        CompletedSave _ ->
+            ( closeModelEdit model, Cmd.none )
 
         EditEntry kind entry value ->
             let
@@ -170,7 +155,7 @@ update msg model =
                             { e | entryType = t }
 
                         Logdate ->
-                            { e | logdate = Result.withDefault entry.logdate (Date.fromIsoString v) }
+                            { e | logdate = Result.withDefault entry.logdate (Iso8601.toTime v) }
 
                         SpendTime ->
                             { e | spendTime = Maybe.withDefault 0 (String.toInt v) }
@@ -181,19 +166,25 @@ update msg model =
             , Cmd.none
             )
 
-        ReceiveDate date ->
+        GotTime date ->
             ( { model | today = date }, Cmd.none )
 
-        Filter weekNumber ->
-            ( { model | weekNumberFilter = Maybe.withDefault 0 (String.toInt weekNumber) }
-            , Http.get
-                { url = "/api/entry/" ++ String.fromInt 2019 ++ "/" ++ weekNumber
-                , expect = Http.expectJson GotEntry (list entryDecoder)
-                }
+        Filter cred weekNumber ->
+            let
+                value =
+                    Maybe.withDefault 0 (String.toInt weekNumber)
+            in
+            ( { model | weekNumberFilter = value }
+            , Entry.fetch 2020 value cred CompletedLoadEntries
             )
 
         GotSession session ->
             ( { model | session = session }, Cmd.none )
+
+
+closeModelEdit : Model -> Model
+closeModelEdit model =
+    { model | modalEdit = ( Modal.hidden, emptyEntry ) }
 
 
 updateSession : Session -> Model -> Model
@@ -221,51 +212,59 @@ view model =
 
         totalHours =
             List.foldl (\e acc -> acc + e.spendTime) 0 model.entries
+
+        maybeCred =
+            Session.cred model.session
     in
     { title = "Entry"
     , content =
-        div []
-            [ div []
-                [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
-                    (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
-                        [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick Add ] [ text "Neu" ]
-                        , numberField
-                            [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput Filter ]
-                            "Kalenderwoche"
-                        , numberField
-                            [ Input.value (totalHours |> String.fromInt)
-                            , Input.disabled True
-                            ]
-                            "Gesamt"
-                        , numberField
-                            [ Input.value (40 - totalHours |> String.fromInt)
-                            , Input.disabled True
-                            ]
-                            "Fehlend"
-                        ]
-                    )
-                , Grid.row []
-                    (List.map
-                        (\t ->
-                            Grid.col []
-                                [ ListGroup.ul
-                                    (ListGroup.li [ ListGroup.info ] [ entryTypeToString t |> text ]
-                                        :: List.map
-                                            (\e -> ListGroup.li [] [ viewEntry e ])
-                                            (List.filter (\entry -> entry.entryType == t) model.entries)
-                                    )
+        case maybeCred of
+            Just cred ->
+                div []
+                    [ div []
+                        [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+                            (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
+                                [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick (Add cred) ] [ text "Neu" ]
+                                , numberField
+                                    [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput (Filter cred) ]
+                                    "Kalenderwoche"
+                                , numberField
+                                    [ Input.value (totalHours |> String.fromInt)
+                                    , Input.disabled True
+                                    ]
+                                    "Gesamt"
+                                , numberField
+                                    [ Input.value (40 - totalHours |> String.fromInt)
+                                    , Input.disabled True
+                                    ]
+                                    "Fehlend"
                                 ]
-                        )
-                        [ Work, Training, School ]
-                    )
-                , editModal model.modalEdit
-                ]
-            ]
+                            )
+                        , Grid.row []
+                            (List.map
+                                (\t ->
+                                    Grid.col []
+                                        [ ListGroup.ul
+                                            (ListGroup.li [ ListGroup.info ] [ entryTypeToString t |> text ]
+                                                :: List.map
+                                                    (\e -> ListGroup.li [] [ viewEntry cred model.zone e ])
+                                                    (List.filter (\entry -> entry.entryType == t) model.entries)
+                                            )
+                                        ]
+                                )
+                                [ Work, Training, School ]
+                            )
+                        , editModal cred model.modalEdit
+                        ]
+                    ]
+
+            Nothing ->
+                div [] []
     }
 
 
-viewEntry : Entry -> Html Msg
-viewEntry entry =
+viewEntry : Cred -> Zone -> Entry -> Html Msg
+viewEntry cred zone entry =
     let
         viewEntryField space field =
             Grid.col [ space ]
@@ -304,10 +303,10 @@ viewEntry entry =
             [ Grid.col []
                 [ ButtonGroup.buttonGroup []
                     [ ButtonGroup.button [ Button.primary, Button.onClick (ShowEdit entry) ] [ text "Bearbeiten" ]
-                    , ButtonGroup.button [ Button.danger, Button.onClick (Remove entry.id) ] [ text "Löschen" ]
+                    , ButtonGroup.button [ Button.danger, Button.onClick (Remove cred entry) ] [ text "Löschen" ]
                     ]
                 ]
-            , viewEntryField Col.xs2 (Date.weekday entry.logdate |> weekdayToString)
+            , viewEntryField Col.xs2 (Time.toWeekday zone entry.logdate |> weekdayToString)
             ]
         ]
 
@@ -321,8 +320,8 @@ subscriptions model =
     Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
 
 
-editModal : ( Modal.Visibility, Entry ) -> Html Msg
-editModal option =
+editModal : Cred -> ( Modal.Visibility, Entry ) -> Html Msg
+editModal cred option =
     let
         visibility =
             Tuple.first option
@@ -343,7 +342,7 @@ editModal option =
                 [ entryTypeToString entryType |> text ]
     in
     div []
-        [ Modal.config (CloseEdit (Result.Ok ()))
+        [ Modal.config CloseEdit
             |> Modal.hideOnBackdropClick True
             |> Modal.h3 [] [ text "Edit Entry" ]
             |> Modal.body []
@@ -352,7 +351,7 @@ editModal option =
                     , Input.onInput (EditEntry Title entry)
                     ]
                 , viewEntryField InputGroup.date
-                    [ Input.value (Date.toIsoString entry.logdate)
+                    [ Input.value (Iso8601.fromTime entry.logdate)
                     , Input.onInput (EditEntry Logdate entry)
                     ]
                 , ButtonGroup.radioButtonGroup [ ButtonGroup.attrs [ Spacing.mb3 ] ]
@@ -366,83 +365,14 @@ editModal option =
                     ]
                 ]
             |> Modal.footer []
-                [ Button.button [ Button.outlinePrimary, Button.onClick (SaveEntry entry) ] [ text "Save" ] ]
+                [ Button.button [ Button.outlinePrimary, Button.onClick (SaveEntry cred entry) ] [ text "Save" ] ]
             |> Modal.view visibility
         ]
 
 
-type alias Entry =
-    { id : Int
-    , title : String
-    , entryType : EntryType
-    , logdate : Date.Date
-    , spendTime : Int
-    }
-
-
-type EntryType
-    = Work
-    | School
-    | Training
-
-
 emptyEntry : Entry
 emptyEntry =
-    Entry 0 "" Work (Date.fromCalendarDate 2000 Jan 1) 0
-
-
-entryDecoder : Decoder Entry
-entryDecoder =
-    map5 Entry
-        (field "id" int)
-        (field "title" string)
-        (field "entry_type" entryTypeDecoder)
-        (field "logdate" string |> andThen (Date.fromIsoString >> fromResult))
-        (field "spend_time" int)
-
-
-entryTypeToString : EntryType -> String
-entryTypeToString entryType =
-    case entryType of
-        Work ->
-            "Betriebliche Tätigkeit"
-
-        School ->
-            "Berufsschule"
-
-        Training ->
-            "Schulung"
-
-
-entryTypeDecoder : Decoder EntryType
-entryTypeDecoder =
-    let
-        decodeToType string =
-            case string of
-                "Betriebliche Tätigkeit" ->
-                    Result.Ok Work
-
-                "Berufsschule" ->
-                    Result.Ok School
-
-                "Schulung" ->
-                    Result.Ok Training
-
-                _ ->
-                    Result.Err ("Not valid pattern for decoder to Suit. Pattern: " ++ string)
-    in
-    string |> andThen (decodeToType >> fromResult)
-
-
-entryEncoder : Entry -> Encode.Value
-entryEncoder entry =
-    Encode.object
-        [ ( "id", Encode.int entry.id )
-        , ( "title", Encode.string entry.title )
-        , ( "entry_type", entryTypeToString entry.entryType |> Encode.string )
-        , ( "logdate", Encode.string (Date.format "yyyy-MM-dd" entry.logdate) )
-        , ( "spend_time", Encode.int entry.spendTime )
-        ]
+    Entry 0 "" Work (Time.millisToPosix 0) 0
 
 
 

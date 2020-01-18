@@ -48,7 +48,7 @@ fn add_handler(req: &mut Request) -> IronResult<Response> {
                 .values(&item)
                 .returning(id)
                 .get_result::<i32>(&db)
-                .map(|i| Response::with(json!(i).to_string()).set(status::Ok))
+                .map(|i| Response::with(json!({ "id": i }).to_string()).set(status::Ok))
                 .map_err(|e| IronError::new(e, status::InternalServerError))
         }
         Ok(None) => Ok(Response::with(status::NotFound)),
