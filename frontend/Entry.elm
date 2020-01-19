@@ -78,13 +78,13 @@ entryTypeToString : EntryType -> String
 entryTypeToString entrytype =
     case entrytype of
         Work ->
-            "betriebliche tätigkeit"
+            "Betriebliche Tätigkeit"
 
         School ->
-            "berufsschule"
+            "Berufsschule"
 
         Training ->
-            "schulung"
+            "Schulung"
 
 
 
