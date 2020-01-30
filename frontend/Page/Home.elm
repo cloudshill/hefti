@@ -10,10 +10,7 @@ import Html exposing (..)
 import Html.Attributes exposing (attribute, class, classList, href, id, placeholder)
 import Html.Events exposing (onClick)
 import Http
-import Loading
-import Log
 import Page
-import PaginatedList exposing (PaginatedList)
 import Session exposing (Session)
 import Task exposing (Task)
 import Time

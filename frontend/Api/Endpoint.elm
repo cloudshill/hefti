@@ -1,6 +1,5 @@
 module Api.Endpoint exposing (Endpoint, entry, login, newEntry, request, week)
 
-import CommentId exposing (CommentId)
 import Http
 import String
 import Url.Builder exposing (QueryParameter)
