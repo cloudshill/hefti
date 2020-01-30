@@ -69,7 +69,7 @@ entryEncoder entry =
         [ ( "id", Encode.int entry.id )
         , ( "title", Encode.string entry.title )
         , ( "entry_type", entryTypeToString entry.entryType |> Encode.string )
-        , ( "logdate", Iso8601.encode entry.logdate )
+        , ( "logdate", Encode.int <| Time.posixToMillis entry.logdate )
         , ( "spend_time", Encode.int entry.spendTime )
         ]
 

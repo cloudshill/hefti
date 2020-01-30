@@ -1,5 +1,5 @@
 use iron::{headers, prelude::*, status, AroundMiddleware, Handler};
-use jsonwebtoken::{decode, Algorithm, Validation};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 
 use crate::handler::login::Claims;
 
@@ -23,7 +23,7 @@ impl AroundMiddleware for Bearer {
                     dbg!(&bearer);
                     match decode::<Claims>(
                         bearer.token.as_ref(),
-                        "secret".as_ref(),
+                        &DecodingKey::from_secret("secret".as_ref()),
                         &Validation::new(Algorithm::HS256),
                     ) {
                         Ok(token) => {

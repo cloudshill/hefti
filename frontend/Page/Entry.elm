@@ -100,7 +100,7 @@ update msg model =
 
         Add cred ->
             ( model
-            , add emptyEntry cred GotAdd
+            , add (newWithId 0) cred GotAdd
             )
 
         GotAdd (Ok ( _, id )) ->

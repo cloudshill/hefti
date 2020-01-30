@@ -28,7 +28,7 @@ cookie = "0.12"
 jsonwebtoken = "*"
 
 dotenv = "0.14"
-diesel = { version = "1.4", features = ["extras", "postgres"] }
+diesel = { version = "1.4", features = ["chrono", "postgres", "r2d2"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 serde = "1.0"

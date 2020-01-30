@@ -2,7 +2,7 @@ use chrono::{Duration, Utc};
 use crypto::scrypt::{scrypt_check, ScryptParams};
 use diesel::prelude::*;
 use iron::{prelude::*, status, typemap::Key};
-use jsonwebtoken::{encode, Header};
+use jsonwebtoken::{encode, EncodingKey, Header};
 use lazy_static::lazy_static;
 use router::Router;
 use serde_derive::{Deserialize, Serialize};
@@ -61,7 +61,7 @@ pub fn login(req: &mut Request) -> IronResult<Response> {
                     .set(json!({
                         "user": {
                             "username": user.name,
-                            "token": encode(&Header::default(), &user_claims, "secret".as_ref()).unwrap(),
+                            "token": encode(&Header::default(), &user_claims, &EncodingKey::from_secret("secret".as_ref())).unwrap(),
                             "image": null
                         }
                     }).to_string()))
