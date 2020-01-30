@@ -64,17 +64,17 @@ init session =
 
 type Msg
     = CompletedLoadEntries (Api.Response (List Entry))
-    | CompletedSave (Api.Response ())
-    | Add Cred
-    | GotAdd (Api.Response Int)
-    | Remove Cred Entry
-    | Removed (Api.Response ())
-    | ShowEdit Entry
-    | SaveEntry Cred Entry
-    | CloseEdit
-    | EditEntry EditMsg Entry String
+    | CompletedSaveEntry (Api.Response ())
+    | CompletedNewEntry (Api.Response Int)
+    | CompletedRemoveEntry (Api.Response ())
+    | ClickedNewEntry Cred
+    | ClickedRemoveEntry Cred Entry
+    | ClickedShowEdit Entry
+    | ClickedSaveEntry Cred Entry
+    | ClickedCloseEdit
+    | ClickedEditEntry EditMsg Entry String
+    | ChangedFilter Cred String
     | GotTime Posix
-    | Filter Cred String
     | GotSession Session
 
 
@@ -98,34 +98,24 @@ update msg model =
         CompletedLoadEntries (Err _) ->
             ( model, Cmd.none )
 
-        Add cred ->
-            ( model
-            , add (newWithId 0) cred GotAdd
-            )
+        CompletedSaveEntry _ ->
+            ( closeModelEdit model, Cmd.none )
 
-        GotAdd (Ok ( _, id )) ->
+        CompletedNewEntry (Ok ( _, id )) ->
             updateEntries model
                 (\entries -> entries ++ [ newWithId id ])
-                |> update (ShowEdit (newWithId id))
+                |> update (ClickedShowEdit (newWithId id))
 
-        GotAdd (Err _) ->
+        CompletedNewEntry (Err _) ->
             ( model, Cmd.none )
 
-        Remove cred entry ->
-            ( updateEntries model (\entries -> List.filter (\e -> e.id /= entry.id) entries)
-            , delete entry cred Removed
-            )
-
-        Removed _ ->
+        CompletedRemoveEntry _ ->
             ( model, Cmd.none )
 
-        ShowEdit entry ->
+        ClickedShowEdit entry ->
             ( { model | modalEdit = ( Modal.shown, entry ) }, Cmd.none )
 
-        CloseEdit ->
-            ( { model | modalEdit = ( Modal.hidden, emptyEntry ) }, Cmd.none )
-
-        SaveEntry cred entry ->
+        ClickedSaveEntry cred entry ->
             ( updateEntries model
                 (\entries ->
                     List.map
@@ -138,13 +128,23 @@ update msg model =
                         )
                         entries
                 )
-            , Entry.update entry cred CompletedSave
+            , Entry.update entry cred CompletedSaveEntry
             )
 
-        CompletedSave _ ->
-            ( closeModelEdit model, Cmd.none )
+        ClickedCloseEdit ->
+            ( { model | modalEdit = ( Modal.hidden, emptyEntry ) }, Cmd.none )
 
-        EditEntry kind entry value ->
+        ClickedNewEntry cred ->
+            ( model
+            , add (newWithId 0) cred CompletedNewEntry
+            )
+
+        ClickedRemoveEntry cred entry ->
+            ( updateEntries model (\entries -> List.filter (\e -> e.id /= entry.id) entries)
+            , delete entry cred CompletedRemoveEntry
+            )
+
+        ClickedEditEntry kind entry value ->
             let
                 updateEntry k e v =
                     case k of
@@ -166,10 +166,7 @@ update msg model =
             , Cmd.none
             )
 
-        GotTime date ->
-            ( { model | today = date }, Cmd.none )
-
-        Filter cred weekNumber ->
+        ChangedFilter cred weekNumber ->
             let
                 value =
                     Maybe.withDefault 0 (String.toInt weekNumber)
@@ -177,6 +174,9 @@ update msg model =
             ( { model | weekNumberFilter = value }
             , Entry.fetch 2020 value cred CompletedLoadEntries
             )
+
+        GotTime date ->
+            ( { model | today = date }, Cmd.none )
 
         GotSession session ->
             ( { model | session = session }, Cmd.none )
@@ -224,9 +224,9 @@ view model =
                     [ div []
                         [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
                             (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
-                                [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick (Add cred) ] [ text "Neu" ]
+                                [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick (ClickedNewEntry cred) ] [ text "Neu" ]
                                 , numberField
-                                    [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput (Filter cred) ]
+                                    [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput (ChangedFilter cred) ]
                                     "Kalenderwoche"
                                 , numberField
                                     [ Input.value (totalHours |> String.fromInt)
@@ -302,8 +302,8 @@ viewEntry cred zone entry =
         , Grid.row []
             [ Grid.col []
                 [ ButtonGroup.buttonGroup []
-                    [ ButtonGroup.button [ Button.primary, Button.onClick (ShowEdit entry) ] [ text "Bearbeiten" ]
-                    , ButtonGroup.button [ Button.danger, Button.onClick (Remove cred entry) ] [ text "Löschen" ]
+                    [ ButtonGroup.button [ Button.primary, Button.onClick (ClickedShowEdit entry) ] [ text "Bearbeiten" ]
+                    , ButtonGroup.button [ Button.danger, Button.onClick (ClickedRemoveEntry cred entry) ] [ text "Löschen" ]
                     ]
                 ]
             , viewEntryField Col.xs2 (Time.toWeekday zone entry.logdate |> weekdayToString)
@@ -338,21 +338,21 @@ editModal cred option =
         radio entryType =
             ButtonGroup.radioButton
                 (entry.entryType == entryType)
-                [ Button.primary, Button.onClick (EditEntry (Type entryType) entry "") ]
+                [ Button.primary, Button.onClick (ClickedEditEntry (Type entryType) entry "") ]
                 [ entryTypeToString entryType |> text ]
     in
     div []
-        [ Modal.config CloseEdit
+        [ Modal.config ClickedCloseEdit
             |> Modal.hideOnBackdropClick True
             |> Modal.h3 [] [ text "Edit Entry" ]
             |> Modal.body []
                 [ viewEntryField InputGroup.text
                     [ Input.value entry.title
-                    , Input.onInput (EditEntry Title entry)
+                    , Input.onInput (ClickedEditEntry Title entry)
                     ]
                 , viewEntryField InputGroup.date
                     [ Input.value (Iso8601.fromTime entry.logdate)
-                    , Input.onInput (EditEntry Logdate entry)
+                    , Input.onInput (ClickedEditEntry Logdate entry)
                     ]
                 , ButtonGroup.radioButtonGroup [ ButtonGroup.attrs [ Spacing.mb3 ] ]
                     [ radio Work
@@ -361,11 +361,11 @@ editModal cred option =
                     ]
                 , viewEntryField InputGroup.number
                     [ Input.value (String.fromInt entry.spendTime)
-                    , Input.onInput (EditEntry SpendTime entry)
+                    , Input.onInput (ClickedEditEntry SpendTime entry)
                     ]
                 ]
             |> Modal.footer []
-                [ Button.button [ Button.outlinePrimary, Button.onClick (SaveEntry cred entry) ] [ text "Save" ] ]
+                [ Button.button [ Button.outlinePrimary, Button.onClick (ClickedSaveEntry cred entry) ] [ text "Save" ] ]
             |> Modal.view visibility
         ]
 
