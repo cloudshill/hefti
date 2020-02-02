@@ -51,7 +51,7 @@ add entry cred expect =
 
 update : Entry -> Cred -> (Api.Response () -> msg) -> Cmd msg
 update entry cred expect =
-    Api.put (Endpoint.entryId entry.id) cred Http.emptyBody expect (Decode.succeed ())
+    Api.put (Endpoint.entryId entry.id) cred (Http.jsonBody <| entryEncoder entry) expect (Decode.succeed ())
 
 
 delete : Entry -> Cred -> (Api.Response () -> msg) -> Cmd msg
