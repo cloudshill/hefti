@@ -350,8 +350,8 @@ editModal option =
                     ]
                 , ButtonGroup.radioButtonGroup [ ButtonGroup.attrs [ Spacing.mb3 ] ]
                     [ radio Work
-                    , radio School
                     , radio Training
+                    , radio School
                     ]
                 , viewEntryField InputGroup.number
                     [ Input.value (String.fromInt entry.spendTime)
