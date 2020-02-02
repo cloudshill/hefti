@@ -251,7 +251,7 @@ view model =
                         )
                         [ Work, Training, School ]
                     )
-                , editModal model.modalEdit
+                , editModal model.modalEdit model.zone
                 ]
             ]
     }
@@ -314,8 +314,8 @@ subscriptions model =
     Sub.none
 
 
-editModal : ( Modal.Visibility, Entry ) -> Html Msg
-editModal option =
+editModal : ( Modal.Visibility, Entry ) -> Zone -> Html Msg
+editModal option zone =
     let
         visibility =
             Tuple.first option
@@ -345,7 +345,7 @@ editModal option =
                     , Input.onInput (ClickedEditEntry Title entry)
                     ]
                 , viewEntryField InputGroup.date
-                    [ Input.value (Iso8601.fromTime entry.logdate)
+                    [ Input.value (Debug.log "Date" (formatDate entry.logdate zone))
                     , Input.onInput (ClickedEditEntry Logdate entry)
                     ]
                 , ButtonGroup.radioButtonGroup [ ButtonGroup.attrs [ Spacing.mb3 ] ]
@@ -362,6 +362,19 @@ editModal option =
                 [ Button.button [ Button.outlinePrimary, Button.onClick (ClickedSaveEntry entry) ] [ text "Save" ] ]
             |> Modal.view visibility
         ]
+
+
+formatDate : Posix -> Zone -> String
+formatDate date zone =
+    DateFormat.format
+        [ DateFormat.yearNumber
+        , DateFormat.text "-"
+        , DateFormat.monthFixed
+        , DateFormat.text "-"
+        , DateFormat.dayOfMonthFixed
+        ]
+        zone
+        date
 
 
 emptyEntry : Entry
