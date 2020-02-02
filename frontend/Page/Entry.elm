@@ -15,6 +15,7 @@ import Bootstrap.Utilities.Display as Display
 import Bootstrap.Utilities.Spacing as Spacing
 import Browser
 import Date
+import DateFormat
 import Entry exposing (..)
 import Html exposing (Html, div, node, pre, text)
 import Html.Attributes as Attributes exposing (class, href, rel)
@@ -182,7 +183,7 @@ update msg model viewer =
             )
 
         GotTime date ->
-            ( { model | today = date }, Cmd.none )
+            ( { model | today = date, weekNumberFilter = String.toInt (DateFormat.format [ DateFormat.weekOfYearNumber ] model.zone date) |> Maybe.withDefault 0 }, Cmd.none )
 
         GotZone zone ->
             ( { model | zone = zone }, Cmd.none )
