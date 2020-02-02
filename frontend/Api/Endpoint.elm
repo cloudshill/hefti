@@ -1,4 +1,4 @@
-module Api.Endpoint exposing (Endpoint, entry, login, newEntry, request, week)
+module Api.Endpoint exposing (Endpoint, entry, entryId, login, request, week)
 
 import Http
 import String
@@ -67,14 +67,14 @@ login =
     url [ "auth", "login" ] []
 
 
-newEntry : Endpoint
-newEntry =
+entry : Endpoint
+entry =
     url [ "entry" ] []
 
 
-entry : Int -> Endpoint
-entry id =
-    url [ "entry" ] []
+entryId : Int -> Endpoint
+entryId id =
+    url [ "entry", String.fromInt id ] []
 
 
 week : Int -> Int -> Endpoint

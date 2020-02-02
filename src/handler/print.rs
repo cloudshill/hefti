@@ -6,7 +6,10 @@ use router::Router;
 use serde_json::json;
 use serde_json::Map;
 
-use crate::{models::Entry, utils::*};
+use crate::{
+    models::{types::EntryKind, Entry},
+    utils::*,
+};
 
 pub fn routes() -> Router {
     let mut router = Router::new();
@@ -26,7 +29,7 @@ fn print_handler(req: &mut Request) -> IronResult<Response> {
 
     let db = get_db(req)?;
     let betrieb = match entries
-        .filter(entry_type.eq("Betriebliche Tätigkeit"))
+        .filter(entry_type.eq(EntryKind::Work))
         .filter(logdate.between(weekdays.first().unwrap(), weekdays.last().unwrap()))
         .order_by(logdate)
         .load::<Entry>(&db)
@@ -36,7 +39,7 @@ fn print_handler(req: &mut Request) -> IronResult<Response> {
     };
 
     let schulungen = match entries
-        .filter(entry_type.eq("Schulung"))
+        .filter(entry_type.eq(EntryKind::Training))
         .filter(logdate.between(weekdays.first().unwrap(), weekdays.last().unwrap()))
         .order_by(logdate)
         .load::<Entry>(&db)
@@ -46,7 +49,7 @@ fn print_handler(req: &mut Request) -> IronResult<Response> {
     };
 
     let schule = match entries
-        .filter(entry_type.eq("Berufsschule"))
+        .filter(entry_type.eq(EntryKind::School))
         .filter(logdate.between(weekdays.first().unwrap(), weekdays.last().unwrap()))
         .order_by(logdate)
         .load::<Entry>(&db)

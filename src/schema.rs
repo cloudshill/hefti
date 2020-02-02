@@ -5,7 +5,7 @@ table! {
         description -> Nullable<Text>,
         spend_time -> Int4,
         logdate -> Date,
-        entry_type -> Text,
+        entry_type -> crate::models::types::EntryKindType,
     }
 }
 
