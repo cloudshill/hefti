@@ -1,4 +1,4 @@
-port module Api exposing (Cred, Response, addServerError, application, decodeErrors, delete, get, login, logout, post, put, storeCredWith, username, viewerChanges)
+port module Api exposing (Cred, Response, WhateverResponse, addServerError, application, decodeErrors, delete, deleteWhatever, get, getWhatever, login, logout, post, postWhatever, put, putWhatever, storeCredWith, username, viewerChanges)
 
 {-| This module is responsible for communicating to the Conduit API.
 
@@ -10,6 +10,7 @@ import Api.Endpoint as Endpoint exposing (Endpoint)
 import Avatar exposing (Avatar)
 import Browser
 import Browser.Navigation as Nav
+import Bytes exposing (Bytes)
 import Http exposing (Body, Expect)
 import Http.Detailed exposing (Error)
 import Json.Decode as Decode exposing (Decoder, Value, decodeString, field, string)
@@ -171,12 +172,26 @@ type alias Response a =
     Result (Error String) ( Http.Metadata, a )
 
 
+type alias WhateverResponse =
+    Result (Error Bytes) ()
+
+
 get : Endpoint -> Maybe Cred -> (Response a -> msg) -> Decoder a -> Cmd msg
 get url maybeCred expect decoder =
+    get_ url maybeCred (Http.Detailed.expectJson expect decoder)
+
+
+getWhatever : Endpoint -> Maybe Cred -> (WhateverResponse -> msg) -> Cmd msg
+getWhatever url maybeCred expect =
+    get_ url maybeCred (Http.Detailed.expectWhatever expect)
+
+
+get_ : Endpoint -> Maybe Cred -> Expect msg -> Cmd msg
+get_ url maybeCred expect =
     Endpoint.request
         { method = "GET"
         , url = url
-        , expect = Http.Detailed.expectJson expect decoder
+        , expect = expect
         , headers =
             case maybeCred of
                 Just cred ->
@@ -192,10 +207,20 @@ get url maybeCred expect decoder =
 
 put : Endpoint -> Cred -> Body -> (Response a -> msg) -> Decoder a -> Cmd msg
 put url cred body expect decoder =
+    put_ url cred body (Http.Detailed.expectJson expect decoder)
+
+
+putWhatever : Endpoint -> Cred -> Body -> (WhateverResponse -> msg) -> Cmd msg
+putWhatever url cred body expect =
+    put_ url cred body (Http.Detailed.expectWhatever expect)
+
+
+put_ : Endpoint -> Cred -> Body -> Expect msg -> Cmd msg
+put_ url cred body expect =
     Endpoint.request
         { method = "PUT"
         , url = url
-        , expect = Http.Detailed.expectJson expect decoder
+        , expect = expect
         , headers = [ credHeader cred ]
         , body = body
         , tracker = Nothing
@@ -205,10 +230,20 @@ put url cred body expect decoder =
 
 post : Endpoint -> Maybe Cred -> Body -> (Response a -> msg) -> Decoder a -> Cmd msg
 post url maybeCred body expect decoder =
+    post_ url maybeCred body (Http.Detailed.expectJson expect decoder)
+
+
+postWhatever : Endpoint -> Maybe Cred -> Body -> (WhateverResponse -> msg) -> Cmd msg
+postWhatever url maybeCred body expect =
+    post_ url maybeCred body (Http.Detailed.expectWhatever expect)
+
+
+post_ : Endpoint -> Maybe Cred -> Body -> Expect msg -> Cmd msg
+post_ url maybeCred body expect =
     Endpoint.request
         { method = "POST"
         , url = url
-        , expect = Http.Detailed.expectJson expect decoder
+        , expect = expect
         , headers =
             case maybeCred of
                 Just cred ->
@@ -224,10 +259,20 @@ post url maybeCred body expect decoder =
 
 delete : Endpoint -> Cred -> Body -> (Response a -> msg) -> Decoder a -> Cmd msg
 delete url cred body expect decoder =
+    delete_ url cred body (Http.Detailed.expectJson expect decoder)
+
+
+deleteWhatever : Endpoint -> Cred -> Body -> (WhateverResponse -> msg) -> Cmd msg
+deleteWhatever url cred body expect =
+    delete_ url cred body (Http.Detailed.expectWhatever expect)
+
+
+delete_ : Endpoint -> Cred -> Body -> Expect msg -> Cmd msg
+delete_ url cred body expect =
     Endpoint.request
         { method = "DELETE"
         , url = url
-        , expect = Http.Detailed.expectJson expect decoder
+        , expect = expect
         , headers = [ credHeader cred ]
         , body = body
         , tracker = Nothing

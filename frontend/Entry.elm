@@ -49,14 +49,14 @@ add entry cred expect =
     Api.post Endpoint.entry (Just cred) body expect (Decode.field "id" int)
 
 
-update : Entry -> Cred -> (Api.Response () -> msg) -> Cmd msg
+update : Entry -> Cred -> (Api.WhateverResponse -> msg) -> Cmd msg
 update entry cred expect =
-    Api.put (Endpoint.entryId entry.id) cred (Http.jsonBody <| entryEncoder entry) expect (Decode.succeed ())
+    Api.putWhatever (Endpoint.entryId entry.id) cred (Http.jsonBody <| entryEncoder entry) expect
 
 
-delete : Entry -> Cred -> (Api.Response () -> msg) -> Cmd msg
+delete : Entry -> Cred -> (Api.WhateverResponse -> msg) -> Cmd msg
 delete entry cred expect =
-    Api.delete (Endpoint.entryId entry.id) cred Http.emptyBody expect (Decode.succeed ())
+    Api.deleteWhatever (Endpoint.entryId entry.id) cred Http.emptyBody expect
 
 
 
@@ -112,8 +112,8 @@ entryDecoder =
         (field "id" int)
         (field "title" string)
         (field "entry_type" entryTypeDecoder)
-        (field "logdata" datetime)
-        (field "spendtime" int)
+        (field "logdate" int |> andThen (\ms -> Decode.succeed <| Time.millisToPosix ms))
+        (field "spend_time" int)
 
 
 entryTypeDecoder : Decoder EntryType

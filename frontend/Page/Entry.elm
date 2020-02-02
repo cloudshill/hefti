@@ -66,9 +66,9 @@ init _ =
 
 type Msg
     = CompletedLoadEntries (Api.Response (List Entry))
-    | CompletedSaveEntry (Api.Response ())
+    | CompletedSaveEntry Api.WhateverResponse
     | CompletedNewEntry (Api.Response Int)
-    | CompletedRemoveEntry (Api.Response ())
+    | CompletedRemoveEntry Api.WhateverResponse
     | ClickedNewEntry
     | ClickedRemoveEntry Entry
     | ClickedShowEdit Entry

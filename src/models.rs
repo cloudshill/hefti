@@ -97,7 +97,7 @@ mod naive_date_converter {
         S: ser::Serializer,
     {
         let duration = *nd - NaiveDate::from_yo(1970, 1);
-        serializer.serialize_i64(duration.num_seconds())
+        serializer.serialize_i64(duration.num_milliseconds())
     }
 
     impl<'de> de::Visitor<'de> for NaiveDateVisitor {
