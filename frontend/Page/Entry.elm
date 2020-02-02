@@ -1,4 +1,4 @@
-module Page.Entry exposing (Model, Msg(..), emptyEntry, init, subscriptions, toSession, update, updateSession, view)
+module Page.Entry exposing (Model, Msg(..), emptyEntry, init, subscriptions, update, view)
 
 import Api exposing (Cred)
 import Bootstrap.Button as Button
@@ -29,6 +29,7 @@ import Session exposing (Session)
 import Task
 import Time exposing (Month(..), Posix, Weekday(..), Zone)
 import Tuple
+import Viewer exposing (Viewer)
 
 
 
@@ -36,8 +37,7 @@ import Tuple
 
 
 type alias Model =
-    { session : Session
-    , entries : List Entry
+    { entries : List Entry
     , modalEdit : ( Modal.Visibility, Entry )
     , today : Posix
     , zone : Zone
@@ -45,16 +45,18 @@ type alias Model =
     }
 
 
-init : Session -> ( Model, Cmd Msg )
-init session =
-    ( { session = session
-      , entries = []
+init : Viewer -> ( Model, Cmd Msg )
+init _ =
+    ( { entries = []
       , modalEdit = ( Modal.hidden, emptyEntry )
       , today = Time.millisToPosix 0
       , zone = Time.utc
       , weekNumberFilter = 0
       }
-    , Cmd.none
+    , Cmd.batch
+        [ Task.perform GotZone Time.here
+        , Task.perform GotTime Time.now
+        ]
     )
 
 
@@ -67,15 +69,15 @@ type Msg
     | CompletedSaveEntry (Api.Response ())
     | CompletedNewEntry (Api.Response Int)
     | CompletedRemoveEntry (Api.Response ())
-    | ClickedNewEntry Cred
-    | ClickedRemoveEntry Cred Entry
+    | ClickedNewEntry
+    | ClickedRemoveEntry Entry
     | ClickedShowEdit Entry
-    | ClickedSaveEntry Cred Entry
+    | ClickedSaveEntry Entry
     | ClickedCloseEdit
     | ClickedEditEntry EditMsg Entry String
-    | ChangedFilter Cred String
+    | ChangedFilter String
     | GotTime Posix
-    | GotSession Session
+    | GotZone Zone
 
 
 type EditMsg
@@ -85,11 +87,14 @@ type EditMsg
     | SpendTime
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : Msg -> Model -> Viewer -> ( Model, Cmd Msg )
+update msg model viewer =
     let
         newWithId id =
             Entry id "" Work model.today 0
+
+        cred =
+            Viewer.cred viewer
     in
     case msg of
         CompletedLoadEntries (Ok entry) ->
@@ -102,9 +107,10 @@ update msg model =
             ( closeModelEdit model, Cmd.none )
 
         CompletedNewEntry (Ok ( _, id )) ->
-            updateEntries model
+            ( updateEntries { model | modalEdit = ( Modal.shown, newWithId id ) }
                 (\entries -> entries ++ [ newWithId id ])
-                |> update (ClickedShowEdit (newWithId id))
+            , Cmd.none
+            )
 
         CompletedNewEntry (Err _) ->
             ( model, Cmd.none )
@@ -115,7 +121,7 @@ update msg model =
         ClickedShowEdit entry ->
             ( { model | modalEdit = ( Modal.shown, entry ) }, Cmd.none )
 
-        ClickedSaveEntry cred entry ->
+        ClickedSaveEntry entry ->
             ( updateEntries model
                 (\entries ->
                     List.map
@@ -134,12 +140,12 @@ update msg model =
         ClickedCloseEdit ->
             ( { model | modalEdit = ( Modal.hidden, emptyEntry ) }, Cmd.none )
 
-        ClickedNewEntry cred ->
+        ClickedNewEntry ->
             ( model
             , add (newWithId 0) cred CompletedNewEntry
             )
 
-        ClickedRemoveEntry cred entry ->
+        ClickedRemoveEntry entry ->
             ( updateEntries model (\entries -> List.filter (\e -> e.id /= entry.id) entries)
             , delete entry cred CompletedRemoveEntry
             )
@@ -166,7 +172,7 @@ update msg model =
             , Cmd.none
             )
 
-        ChangedFilter cred weekNumber ->
+        ChangedFilter weekNumber ->
             let
                 value =
                     Maybe.withDefault 0 (String.toInt weekNumber)
@@ -178,18 +184,13 @@ update msg model =
         GotTime date ->
             ( { model | today = date }, Cmd.none )
 
-        GotSession session ->
-            ( { model | session = session }, Cmd.none )
+        GotZone zone ->
+            ( { model | zone = zone }, Cmd.none )
 
 
 closeModelEdit : Model -> Model
 closeModelEdit model =
     { model | modalEdit = ( Modal.hidden, emptyEntry ) }
-
-
-updateSession : Session -> Model -> Model
-updateSession session model =
-    { model | session = session }
 
 
 updateEntries : Model -> (List Entry -> List Entry) -> Model
@@ -212,59 +213,51 @@ view model =
 
         totalHours =
             List.foldl (\e acc -> acc + e.spendTime) 0 model.entries
-
-        maybeCred =
-            Session.cred model.session
     in
     { title = "Entry"
     , content =
-        case maybeCred of
-            Just cred ->
-                div []
-                    [ div []
-                        [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
-                            (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
-                                [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick (ClickedNewEntry cred) ] [ text "Neu" ]
-                                , numberField
-                                    [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput (ChangedFilter cred) ]
-                                    "Kalenderwoche"
-                                , numberField
-                                    [ Input.value (totalHours |> String.fromInt)
-                                    , Input.disabled True
-                                    ]
-                                    "Gesamt"
-                                , numberField
-                                    [ Input.value (40 - totalHours |> String.fromInt)
-                                    , Input.disabled True
-                                    ]
-                                    "Fehlend"
-                                ]
-                            )
-                        , Grid.row []
-                            (List.map
-                                (\t ->
-                                    Grid.col []
-                                        [ ListGroup.ul
-                                            (ListGroup.li [ ListGroup.info ] [ entryTypeToString t |> text ]
-                                                :: List.map
-                                                    (\e -> ListGroup.li [] [ viewEntry cred model.zone e ])
-                                                    (List.filter (\entry -> entry.entryType == t) model.entries)
-                                            )
-                                        ]
-                                )
-                                [ Work, Training, School ]
-                            )
-                        , editModal cred model.modalEdit
+        div []
+            [ div []
+                [ Grid.row [ Row.attrs [ Spacing.mt3 ] ]
+                    (List.map (\e -> Grid.col [ Col.attrs [ Spacing.mb3 ] ] [ e ])
+                        [ Button.button [ Button.success, Button.block, Button.attrs [ Spacing.mb3 ], Button.onClick ClickedNewEntry ] [ text "Neu" ]
+                        , numberField
+                            [ Input.value (String.fromInt model.weekNumberFilter), Input.onInput ChangedFilter ]
+                            "Kalenderwoche"
+                        , numberField
+                            [ Input.value (totalHours |> String.fromInt)
+                            , Input.disabled True
+                            ]
+                            "Gesamt"
+                        , numberField
+                            [ Input.value (40 - totalHours |> String.fromInt)
+                            , Input.disabled True
+                            ]
+                            "Fehlend"
                         ]
-                    ]
-
-            Nothing ->
-                div [] []
+                    )
+                , Grid.row []
+                    (List.map
+                        (\t ->
+                            Grid.col []
+                                [ ListGroup.ul
+                                    (ListGroup.li [ ListGroup.info ] [ entryTypeToString t |> text ]
+                                        :: List.map
+                                            (\e -> ListGroup.li [] [ viewEntry model.zone e ])
+                                            (List.filter (\entry -> entry.entryType == t) model.entries)
+                                    )
+                                ]
+                        )
+                        [ Work, Training, School ]
+                    )
+                , editModal model.modalEdit
+                ]
+            ]
     }
 
 
-viewEntry : Cred -> Zone -> Entry -> Html Msg
-viewEntry cred zone entry =
+viewEntry : Zone -> Entry -> Html Msg
+viewEntry zone entry =
     let
         viewEntryField space field =
             Grid.col [ space ]
@@ -303,7 +296,7 @@ viewEntry cred zone entry =
             [ Grid.col []
                 [ ButtonGroup.buttonGroup []
                     [ ButtonGroup.button [ Button.primary, Button.onClick (ClickedShowEdit entry) ] [ text "Bearbeiten" ]
-                    , ButtonGroup.button [ Button.danger, Button.onClick (ClickedRemoveEntry cred entry) ] [ text "Löschen" ]
+                    , ButtonGroup.button [ Button.danger, Button.onClick (ClickedRemoveEntry entry) ] [ text "Löschen" ]
                     ]
                 ]
             , viewEntryField Col.xs2 (Time.toWeekday zone entry.logdate |> weekdayToString)
@@ -317,11 +310,11 @@ viewEntry cred zone entry =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
+    Sub.none
 
 
-editModal : Cred -> ( Modal.Visibility, Entry ) -> Html Msg
-editModal cred option =
+editModal : ( Modal.Visibility, Entry ) -> Html Msg
+editModal option =
     let
         visibility =
             Tuple.first option
@@ -365,7 +358,7 @@ editModal cred option =
                     ]
                 ]
             |> Modal.footer []
-                [ Button.button [ Button.outlinePrimary, Button.onClick (ClickedSaveEntry cred entry) ] [ text "Save" ] ]
+                [ Button.button [ Button.outlinePrimary, Button.onClick (ClickedSaveEntry entry) ] [ text "Save" ] ]
             |> Modal.view visibility
         ]
 
@@ -373,12 +366,3 @@ editModal cred option =
 emptyEntry : Entry
 emptyEntry =
     Entry 0 "" Work (Time.millisToPosix 0) 0
-
-
-
--- EXPORT
-
-
-toSession : Model -> Session
-toSession model =
-    model.session

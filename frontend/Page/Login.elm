@@ -1,7 +1,4 @@
-module Page.Login exposing (Model, Msg, init, subscriptions, toSession, update, updateSession, view)
-
-{-| The login page.
--}
+module Page.Login exposing (Model, Msg, init, subscriptions, update, view)
 
 import Api exposing (Cred)
 import Bootstrap.Alert as Alert
@@ -32,8 +29,7 @@ import Viewer exposing (Viewer)
 
 
 type alias Model =
-    { session : Session
-    , problems : List Problem
+    { problems : List Problem
     , form : Form
     }
 
@@ -49,10 +45,9 @@ type alias Form =
     }
 
 
-init : Session -> ( Model, Cmd msg )
-init session =
-    ( { session = session
-      , problems = []
+init : ( Model, Cmd msg )
+init =
+    ( { problems = []
       , form =
             { username = ""
             , password = ""
@@ -138,7 +133,6 @@ type Msg
     | EnteredUsername String
     | EnteredPassword String
     | CompletedLogin (Result (Error String) ( Http.Metadata, Viewer ))
-    | GotSession Session
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -177,16 +171,6 @@ update msg model =
             , Viewer.store viewer
             )
 
-        GotSession session ->
-            ( { model | session = session }
-            , Route.replaceUrl (Session.navKey session) Route.Home
-            )
-
-
-updateSession : Session -> Model -> Model
-updateSession session model =
-    { model | session = session }
-
 
 {-| Helper function for `update`. Updates the form and returns Cmd.none.
 Useful for recording form fields!
@@ -202,7 +186,7 @@ updateForm transform model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
+    Sub.none
 
 
 
@@ -282,12 +266,3 @@ encodeForm (Trimmed form) =
         [ ( "username", Encode.string form.username )
         , ( "password", Encode.string form.password )
         ]
-
-
-
--- EXPORT
-
-
-toSession : Model -> Session
-toSession model =
-    model.session

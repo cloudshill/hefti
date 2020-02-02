@@ -1,4 +1,4 @@
-module Page.Home exposing (Model, Msg, init, subscriptions, toSession, update, updateSession, view)
+module Page.Home exposing (Model, Msg, init, subscriptions, update, view)
 
 {-| The homepage. You can get here via either the / or /#/ routes.
 -}
@@ -16,6 +16,7 @@ import Task exposing (Task)
 import Time
 import Url.Builder
 import Username exposing (Username)
+import Viewer exposing (Viewer)
 
 
 
@@ -23,12 +24,12 @@ import Username exposing (Username)
 
 
 type alias Model =
-    { session : Session }
+    {}
 
 
-init : Session -> ( Model, Cmd Msg )
-init session =
-    ( { session = session }, Cmd.none )
+init : Viewer -> ( Model, Cmd Msg )
+init _ =
+    ( {}, Cmd.none )
 
 
 
@@ -43,34 +44,19 @@ view model =
     }
 
 
-viewBanner : Html msg
-viewBanner =
-    div [ class "banner" ]
-        [ div [ class "container" ]
-            [ h1 [ class "logo-font" ] [ text "conduit" ]
-            , p [] [ text "A place to share your knowledge." ]
-            ]
-        ]
-
-
 
 -- UPDATE
 
 
 type Msg
-    = GotSession Session
+    = DummyMsg
 
 
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
+update : Msg -> Model -> Viewer -> ( Model, Cmd Msg )
+update msg model _ =
     case msg of
-        GotSession session ->
-            ( { model | session = session }, Cmd.none )
-
-
-updateSession : Session -> Model -> Model
-updateSession session model =
-    { model | session = session }
+        DummyMsg ->
+            ( model, Cmd.none )
 
 
 
@@ -79,13 +65,4 @@ updateSession session model =
 
 subscriptions : Model -> Sub Msg
 subscriptions model =
-    Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
-
-
-
--- EXPORT
-
-
-toSession : Model -> Session
-toSession model =
-    model.session
+    Sub.none

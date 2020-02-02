@@ -30,9 +30,15 @@ import Viewer exposing (Viewer)
 -- See https://discourse.elm-lang.org/t/elm-spa-in-0-19/1800/2 for more.
 
 
-type Model
-    = Redirect Session
-    | NotFound Session
+type alias Model =
+    { session : Session
+    , pageModel : PageModel
+    }
+
+
+type PageModel
+    = Redirect
+    | NotFound
     | Home Home.Model
     | Login Login.Model
     | Entry Entry.Model
@@ -50,7 +56,9 @@ init maybeViewer url navKey =
 
         ( model, msg ) =
             changeRouteTo (Route.fromUrl url)
-                (Redirect (Session.fromViewer navbarState navKey maybeViewer))
+                { session = Session.fromViewer navbarState navKey maybeViewer
+                , pageModel = Redirect
+                }
     in
     ( model
     , Cmd.batch [ msg, navbarCmd ]
@@ -65,10 +73,10 @@ view : Model -> Document Msg
 view model =
     let
         viewer =
-            Session.viewer (toSession model)
+            Session.viewer model.session
 
         navbarState =
-            Session.navState <| toSession model
+            Session.navState model.session
 
         viewPage toMsg config =
             let
@@ -79,11 +87,11 @@ view model =
             , body = Page.viewHeader GotNavbar navbarState viewer :: List.map (Html.map toMsg) body
             }
     in
-    case model of
-        Redirect _ ->
+    case model.pageModel of
+        Redirect ->
             Page.view Blank.view
 
-        NotFound _ ->
+        NotFound ->
             Page.view NotFound.view
 
         Home home ->
@@ -110,140 +118,134 @@ type Msg
     | GotNavbar Navbar.State
 
 
-toSession : Model -> Session
-toSession page =
-    case page of
-        Redirect session ->
-            session
-
-        NotFound session ->
-            session
-
-        Home home ->
-            Home.toSession home
-
-        Login login ->
-            Login.toSession login
-
-        Entry entry ->
-            Entry.toSession entry
-
-
 changeRouteTo : Maybe Route -> Model -> ( Model, Cmd Msg )
 changeRouteTo maybeRoute model =
-    let
-        session =
-            toSession model
-    in
-    case maybeRoute of
+    case Session.viewer model.session of
         Nothing ->
-            ( NotFound session, Cmd.none )
+            case maybeRoute of
+                Just Route.Login ->
+                    Login.init
+                        |> updateWith Login GotLoginMsg model
 
-        Just Route.Root ->
-            ( model, Route.replaceUrl (Session.navKey session) Route.Home )
+                Nothing ->
+                    ( { model | pageModel = NotFound }, Cmd.none )
 
-        Just Route.Logout ->
-            ( model, Api.logout )
+                _ ->
+                    ( model, Route.replaceUrl (Session.navKey model.session) Route.Login )
 
-        Just Route.Home ->
-            Home.init session
-                |> updateWith Home GotHomeMsg model
+        Just viewer ->
+            case maybeRoute of
+                Nothing ->
+                    ( { model | pageModel = NotFound }, Cmd.none )
 
-        Just Route.Login ->
-            Login.init session
-                |> updateWith Login GotLoginMsg model
+                Just Route.Root ->
+                    ( model, Route.replaceUrl (Session.navKey model.session) Route.Home )
 
-        Just Route.Entry ->
-            Entry.init session
-                |> updateWith Entry GotEntryMsg model
+                Just Route.Logout ->
+                    ( model, Api.logout )
+
+                Just Route.Home ->
+                    Home.init viewer
+                        |> updateWith Home GotHomeMsg model
+
+                Just Route.Login ->
+                    Login.init
+                        |> updateWith Login GotLoginMsg model
+
+                Just Route.Entry ->
+                    Entry.init viewer
+                        |> updateWith Entry GotEntryMsg model
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case ( msg, model ) of
-        ( ClickedLink urlRequest, _ ) ->
-            case urlRequest of
-                Browser.Internal url ->
-                    case url.fragment of
-                        Nothing ->
-                            -- If we got a link that didn't include a fragment,
-                            -- it's from one of those (href "") attributes that
-                            -- we have to include to make the RealWorld CSS work.
-                            --
-                            -- In an application doing path routing instead of
-                            -- fragment-based routing, this entire
-                            -- `case url.fragment of` expression this comment
-                            -- is inside would be unnecessary.
-                            ( model, Cmd.none )
+    case Session.viewer model.session of
+        Nothing ->
+            case ( Debug.log "Guest" msg, model.pageModel ) of
+                ( ChangedUrl url, _ ) ->
+                    changeRouteTo (Route.fromUrl url) model
 
-                        Just _ ->
-                            ( model
-                            , Nav.pushUrl (Session.navKey (toSession model)) (Url.toString url)
-                            )
+                ( GotLoginMsg subMsg, Login login ) ->
+                    Login.update subMsg login
+                        |> updateWith Login GotLoginMsg model
 
-                Browser.External href ->
-                    ( model
-                    , Nav.load href
+                ( GotSession session, _ ) ->
+                    ( { model | session = session }
+                    , Route.replaceUrl (Session.navKey session) Route.Home
                     )
 
-        ( ChangedUrl url, _ ) ->
-            changeRouteTo (Route.fromUrl url) model
+                ( GotNavbar state, _ ) ->
+                    ( { model | session = Session.changeNavState state model.session }
+                    , Cmd.none
+                    )
 
-        ( GotLoginMsg subMsg, Login login ) ->
-            Login.update subMsg login
-                |> updateWith Login GotLoginMsg model
+                ( _, _ ) ->
+                    ( model
+                    , Route.replaceUrl (Session.navKey model.session) Route.Login
+                    )
 
-        ( GotHomeMsg subMsg, Home home ) ->
-            Home.update subMsg home
-                |> updateWith Home GotHomeMsg model
+        Just viewer ->
+            case ( Debug.log "LoggedIn" msg, model.pageModel ) of
+                ( ClickedLink urlRequest, _ ) ->
+                    case urlRequest of
+                        Browser.Internal url ->
+                            case url.fragment of
+                                Nothing ->
+                                    -- If we got a link that didn't include a fragment,
+                                    -- it's from one of those (href "") attributes that
+                                    -- we have to include to make the RealWorld CSS work.
+                                    --
+                                    -- In an application doing path routing instead of
+                                    -- fragment-based routing, this entire
+                                    -- `case url.fragment of` expression this comment
+                                    -- is inside would be unnecessary.
+                                    ( model, Cmd.none )
 
-        ( GotEntryMsg subMsg, Entry entry ) ->
-            Entry.update subMsg entry
-                |> updateWith Entry GotEntryMsg model
+                                Just _ ->
+                                    ( model
+                                    , Nav.pushUrl (Session.navKey model.session) (Url.toString url)
+                                    )
 
-        ( GotSession session, Redirect _ ) ->
-            ( Redirect session
-            , Route.replaceUrl (Session.navKey session) Route.Home
-            )
+                        Browser.External href ->
+                            ( model
+                            , Nav.load href
+                            )
 
-        ( GotNavbar state, _ ) ->
-            ( updateNavbarState state model
-            , Cmd.none
-            )
+                ( ChangedUrl url, _ ) ->
+                    changeRouteTo (Route.fromUrl url) model
 
-        ( _, _ ) ->
-            -- Disregard messages that arrived for the wrong page.
-            ( model, Cmd.none )
+                ( GotLoginMsg subMsg, Login login ) ->
+                    Login.update subMsg login
+                        |> updateWith Login GotLoginMsg model
+
+                ( GotHomeMsg subMsg, Home home ) ->
+                    Home.update subMsg home viewer
+                        |> updateWith Home GotHomeMsg model
+
+                ( GotEntryMsg subMsg, Entry entry ) ->
+                    Entry.update subMsg entry viewer
+                        |> updateWith Entry GotEntryMsg model
+
+                ( GotSession session, _ ) ->
+                    ( { model | session = session }
+                    , Route.replaceUrl (Session.navKey session) Route.Home
+                    )
+
+                ( GotNavbar state, _ ) ->
+                    ( { model | session = Session.changeNavState state model.session }
+                    , Cmd.none
+                    )
+
+                ( _, _ ) ->
+                    -- Disregard messages that arrived for the wrong page.
+                    ( model, Cmd.none )
 
 
-updateWith : (subModel -> Model) -> (subMsg -> Msg) -> Model -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
+updateWith : (subModel -> PageModel) -> (subMsg -> Msg) -> Model -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
 updateWith toModel toMsg model ( subModel, subCmd ) =
-    ( toModel subModel
+    ( { model | pageModel = toModel subModel }
     , Cmd.map toMsg subCmd
     )
-
-
-updateNavbarState : Navbar.State -> Model -> Model
-updateNavbarState state model =
-    let
-        updatedSession session =
-            Session.changeNavState state session
-    in
-    case model of
-        Redirect session ->
-            Redirect <| updatedSession session
-
-        NotFound session ->
-            NotFound <| updatedSession session
-
-        Home home ->
-            Home (Home.updateSession (updatedSession (Home.toSession home)) home)
-
-        Login login ->
-            Login (Login.updateSession (updatedSession (Login.toSession login)) login)
-
-        Entry entry ->
-            Entry (Entry.updateSession (updatedSession (Entry.toSession entry)) entry)
 
 
 
@@ -253,12 +255,12 @@ updateNavbarState state model =
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ case model of
-            NotFound _ ->
+        [ case model.pageModel of
+            NotFound ->
                 Sub.none
 
-            Redirect _ ->
-                Session.changes GotSession (Session.navState (toSession model)) (Session.navKey (toSession model))
+            Redirect ->
+                Sub.none
 
             Home home ->
                 Sub.map GotHomeMsg (Home.subscriptions home)
@@ -268,7 +270,8 @@ subscriptions model =
 
             Entry entry ->
                 Sub.map GotEntryMsg (Entry.subscriptions entry)
-        , Navbar.subscriptions (Session.navState (toSession model)) GotNavbar
+        , Session.changes GotSession (Session.navState model.session) (Session.navKey model.session)
+        , Navbar.subscriptions (Session.navState model.session) GotNavbar
         ]
 
 
